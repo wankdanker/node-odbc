@@ -22,18 +22,18 @@ class ODBCResult : public node::ObjectWrap {
   public:
    static Persistent<FunctionTemplate> constructor_template;
    static void Init(v8::Handle<Object> target);
-   
+
    void Free();
-   
+
   protected:
     ODBCResult() {};
-    
-    explicit ODBCResult(HENV hENV, HDBC hDBC, HSTMT hSTMT): 
+
+    explicit ODBCResult(HENV hENV, HDBC hDBC, HSTMT hSTMT):
       ObjectWrap(),
       m_hENV(hENV),
       m_hDBC(hDBC),
       m_hSTMT(hSTMT) {};
-     
+
     ~ODBCResult();
 
     //constructor
@@ -42,22 +42,24 @@ class ODBCResult : public node::ObjectWrap {
     //async methods
     static Handle<Value> Fetch(const Arguments& args);
     static void UV_Fetch(uv_work_t* work_req);
+    static void UV_AfterFetch(uv_work_t* work_req, int status);
     static void UV_AfterFetch(uv_work_t* work_req);
 
     static Handle<Value> FetchAll(const Arguments& args);
     static void UV_FetchAll(uv_work_t* work_req);
+    static void UV_AfterFetchAll(uv_work_t* work_req, int status);
     static void UV_AfterFetchAll(uv_work_t* work_req);
-    
+
     //sync methods
     static Handle<Value> Close(const Arguments& args);
     static Handle<Value> MoreResults(const Arguments& args);
-    
+
     struct Fetch_Request {
       Persistent<Function> callback;
       ODBCResult *objResult;
       SQLRETURN result;
     };
-    
+
     ODBCResult *self(void) { return this; }
 
   protected:

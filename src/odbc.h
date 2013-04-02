@@ -46,7 +46,7 @@ typedef struct {
   SQLSMALLINT  type;
   SQLLEN       size;
   void        *buffer;
-  SQLLEN       buffer_length;    
+  SQLLEN       buffer_length;
   SQLLEN       length;
   SQLSMALLINT  decimals;
 } Parameter;
@@ -56,18 +56,18 @@ class ODBC : public node::ObjectWrap {
     static Persistent<FunctionTemplate> constructor_template;
     static uv_mutex_t g_odbcMutex;
     static uv_async_t g_async;
-    
+
     static void Init(v8::Handle<Object> target);
     static Column* GetColumns(SQLHSTMT hStmt, short* colCount);
     static void FreeColumns(Column* columns, short* colCount);
     static Handle<Value> GetColumnValue(SQLHSTMT hStmt, Column column, uint16_t* buffer, int bufferLength);
     static Handle<Value> GetRecordTuple (SQLHSTMT hStmt, Column* columns, short* colCount, uint16_t* buffer, int bufferLength);
     static Handle<Value> GetRecordArray (SQLHSTMT hStmt, Column* columns, short* colCount, uint16_t* buffer, int bufferLength);
-    
+
     static Parameter* GetParametersFromArray (Local<Array> values, int* paramCount);
-    
+
     void Free();
-    
+
   protected:
     ODBC() {}
 
@@ -78,33 +78,37 @@ class ODBC : public node::ObjectWrap {
     //Property Getter/Setters
     static Handle<Value> ModeGetter(Local<String> property, const AccessorInfo &info);
     static void ModeSetter(Local<String> property, Local<Value> value, const AccessorInfo &info);
-    
+
     static Handle<Value> ConnectedGetter(Local<String> property, const AccessorInfo &info);
-    
+
+    static void UV_AfterOpen(uv_work_t* req, int status);
     static void UV_AfterOpen(uv_work_t* req);
     static void UV_Open(uv_work_t* req);
     static Handle<Value> Open(const Arguments& args);
 
+    static void UV_AfterClose(uv_work_t* req, int status);
     static void UV_AfterClose(uv_work_t* req);
     static void UV_Close(uv_work_t* req);
     static Handle<Value> Close(const Arguments& args);
 
+    static void UV_AfterQuery(uv_work_t* req, int status);
     static void UV_AfterQuery(uv_work_t* req);
     static void UV_Query(uv_work_t* req);
     static Handle<Value> Query(const Arguments& args);
 
+    static void UV_AfterQueryAll(uv_work_t* req, int status);
     static void UV_AfterQueryAll(uv_work_t* req);
     static void UV_QueryAll(uv_work_t* req);
     static Handle<Value> QueryAll(const Arguments& args);
-    
+
     static void UV_Tables(uv_work_t* req);
     static Handle<Value> Tables(const Arguments& args);
 
     static void UV_Columns(uv_work_t* req);
     static Handle<Value> Columns(const Arguments& args);
-  
+
     static void WatcherCallback(uv_async_t* w, int revents);
-    
+
     ODBC *self(void) { return this; }
 
   protected:
