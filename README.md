@@ -632,6 +632,9 @@ eio.setMinParallel(threadCount);
 * If you have column names longer than 30 characters, you should add 
   "TDS_Version=7.0" to your connection string to retrive the full column name.
   * Example : "DRIVER={FreeTDS};SERVER=host;UID=user;PWD=password;DATABASE=dbname;TDS_Version=7.0"
+* If you got error "[unixODBC][FreeTDS][SQL Server]Unable to connect to data source" 
+  Try use SERVERNAME instead of SERVER
+  * Example : "DRIVER={FreeTDS};SERVERNAME=host;UID=user;PWD=password;DATABASE=dbname"
 * Be sure that your odbcinst.ini has the proper threading configuration for your
   FreeTDS driver. If you choose the incorrect threading model it may cause
   the thread pool to be blocked by long running queries. This is what 
