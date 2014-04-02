@@ -310,10 +310,10 @@ void ODBCResult::UV_AfterFetch(uv_work_t* work_req, int status) {
     }
   }
   
+  data->objResult->Unref();
+  
   free(data);
   free(work_req);
-  
-  data->objResult->Unref();
   
   return;
 }
