@@ -447,17 +447,17 @@ Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
       }
 #else
       struct tm timeInfo = { 
-        tm_sec : 0
-        , tm_min : 0
-        , tm_hour : 0
-        , tm_mday : 0
-        , tm_mon : 0
-        , tm_year : 0
-        , tm_wday : 0
-        , tm_yday : 0
-        , tm_isdst : 0
-        , tm_gmtoff : 0
-        , tm_zone : 0
+        .tm_sec = 0
+        , .tm_min = 0
+        , .tm_hour = 0
+        , .tm_mday = 0
+        , .tm_mon = 0
+        , .tm_year = 0
+        , .tm_wday = 0
+        , .tm_yday = 0
+        , .tm_isdst = 0
+        , .tm_gmtoff = 0
+        , .tm_zone = 0
       };
 
       SQL_TIMESTAMP_STRUCT odbcTime;
