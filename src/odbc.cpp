@@ -355,11 +355,8 @@ SQLSMALLINT ODBC::GetCColumnType(const Column& column) {
 
     // Date and time
     case SQL_TIMESTAMP: case SQL_TYPE_TIMESTAMP:
-      return SQL_C_TYPE_TIMESTAMP;
-
-    // Just date
     case SQL_DATE: case SQL_TYPE_DATE:
-      return SQL_C_TYPE_DATE;
+      return SQL_C_TYPE_TIMESTAMP;
 
     case SQL_BINARY: case SQL_VARBINARY: case SQL_LONGVARBINARY:
       return SQL_C_BINARY;
@@ -414,35 +411,20 @@ Handle<Value> ODBC::ConvertColumnValue( SQLSMALLINT cType,
       return scope.Close(Number::New(*reinterpret_cast<double*>(buffer)));
       break;
 
-    case SQL_C_TYPE_TIMESTAMP: case SQL_C_TYPE_DATE: {
+    case SQL_C_TYPE_TIMESTAMP: {
       struct tm timeInfo = { 0 };
       SQLUINTEGER fraction = 0;
 
-      switch (cType) {
-        case SQL_C_TYPE_TIMESTAMP: {
-          assert(bytesInBuffer >= sizeof(SQL_TIMESTAMP_STRUCT));
-          SQL_TIMESTAMP_STRUCT& odbcTime = *reinterpret_cast<SQL_TIMESTAMP_STRUCT*>(buffer);
+      assert(bytesInBuffer >= sizeof(SQL_TIMESTAMP_STRUCT));
+      SQL_TIMESTAMP_STRUCT& odbcTime = *reinterpret_cast<SQL_TIMESTAMP_STRUCT*>(buffer);
 
-          timeInfo.tm_year = odbcTime.year - 1900;
-          timeInfo.tm_mon = odbcTime.month - 1;
-          timeInfo.tm_mday = odbcTime.day;
-          timeInfo.tm_hour = odbcTime.hour;
-          timeInfo.tm_min = odbcTime.minute;
-          timeInfo.tm_sec = odbcTime.second;
-          fraction = odbcTime.fraction;
-          break;
-        }
-
-        case SQL_C_TYPE_DATE: {
-          assert(bytesInBuffer >= sizeof(SQL_DATE_STRUCT));
-          SQL_DATE_STRUCT& odbcDate = *reinterpret_cast<SQL_DATE_STRUCT*>(buffer);
-
-          timeInfo.tm_year = odbcDate.year - 1900;
-          timeInfo.tm_mon = odbcDate.month - 1;
-          timeInfo.tm_mday = odbcDate.day;
-          break;
-        }
-      }
+      timeInfo.tm_year = odbcTime.year - 1900;
+      timeInfo.tm_mon = odbcTime.month - 1;
+      timeInfo.tm_mday = odbcTime.day;
+      timeInfo.tm_hour = odbcTime.hour;
+      timeInfo.tm_min = odbcTime.minute;
+      timeInfo.tm_sec = odbcTime.second;
+      fraction = odbcTime.fraction;
 
       //a negative value means that mktime() should use timezone information 
       //and system databases to attempt to determine whether DST is in effect 
