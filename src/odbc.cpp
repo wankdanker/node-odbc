@@ -376,11 +376,11 @@ SQLRETURN ODBC::GetColumnData( SQLHSTMT hStmt, const Column& column,
 
   switch(cType) {
     case SQL_C_SLONG:
-      bufferLength = sizeof(long);
+      bufferLength = sizeof(SQLINTEGER);
       break;
     
     case SQL_C_DOUBLE:
-      bufferLength = sizeof(double);
+      bufferLength = sizeof(SQLDOUBLE);
       break;
   }
 
@@ -401,14 +401,13 @@ Handle<Value> ODBC::ConvertColumnValue( SQLSMALLINT cType,
 
   switch (cType) {
     case SQL_C_SLONG:
-      assert(bytesInBuffer >= sizeof(long));
-      // XXX Integer::New will truncate here if sizeof(long) > 4, it expects 32-bit numbers
-      return scope.Close(Integer::New(*reinterpret_cast<long*>(buffer)));
+      assert(bytesInBuffer >= sizeof(SQLINTEGER));
+      return scope.Close(Integer::New(*reinterpret_cast<SQLINTEGER*>(buffer)));
       break;
 
     case SQL_C_DOUBLE:
-      assert(bytesInBuffer >= sizeof(double));
-      return scope.Close(Number::New(*reinterpret_cast<double*>(buffer)));
+      assert(bytesInBuffer >= sizeof(SQLDOUBLE));
+      return scope.Close(Number::New(*reinterpret_cast<SQLDOUBLE*>(buffer)));
       break;
 
     case SQL_C_TYPE_TIMESTAMP: {
