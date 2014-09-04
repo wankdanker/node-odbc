@@ -81,11 +81,11 @@ class ODBC : public node::ObjectWrap {
     static Column* GetColumns(SQLHSTMT hStmt, short* colCount);
     static void FreeColumns(Column* columns, short* colCount);
     static SQLRETURN GetCColumnType(const Column& column);
-    static SQLRETURN GetColumnData(SQLHSTMT hStmt, const Column& column, void* buffer, int bufferLength, SQLSMALLINT& cType, SQLINTEGER& len);
+    static SQLRETURN GetColumnData(SQLHSTMT hStmt, const Column& column, void* buffer, SQLLEN bufferLength, SQLSMALLINT& cType, SQLLEN& len);
     static Handle<Value> ConvertColumnValue(SQLSMALLINT cType, uint16_t* buffer, SQLINTEGER bytesInBuffer, node::Buffer* resultBuffer, size_t resultBufferOffset);
-    static SQLRETURN FetchMoreData(SQLHSTMT hStmt, const Column& column, SQLSMALLINT cType, SQLINTEGER& bytesAvailable, SQLINTEGER& bytesRead, void* internalBuffer, SQLINTEGER internalBufferLength, void* resultBuffer, size_t& offset, int resultBufferLength);
-    static Handle<Value> InterpretBuffers(SQLSMALLINT cType, void* internalBuffer, SQLINTEGER bytesRead, Handle<Object> resultBufferHandle, void* resultBuffer, size_t resultBufferOffset);
-    static Handle<Value> GetColumnValue(SQLHSTMT hStmt, Column column, uint16_t* buffer, int bufferLength, bool partial = false, bool fetch = true);
+    static SQLRETURN FetchMoreData(SQLHSTMT hStmt, const Column& column, SQLSMALLINT cType, SQLLEN& bytesAvailable, SQLLEN& bytesRead, void* internalBuffer, SQLLEN internalBufferLength, void* resultBuffer, size_t& offset, SQLLEN resultBufferLength);
+    static Handle<Value> InterpretBuffers(SQLSMALLINT cType, void* internalBuffer, SQLLEN bytesRead, Handle<Object> resultBufferHandle, void* resultBuffer, size_t resultBufferOffset);
+    static Handle<Value> GetColumnValue(SQLHSTMT hStmt, Column column, uint16_t* buffer, SQLLEN bufferLength, bool partial = false, bool fetch = true);
     static Local<Object> GetRecordTuple (SQLHSTMT hStmt, Column* columns, short* colCount, uint16_t* buffer, int bufferLength);
     static Handle<Value> GetRecordArray (SQLHSTMT hStmt, Column* columns, short* colCount, uint16_t* buffer, int bufferLength);
     static Handle<Value> CallbackSQLError (SQLSMALLINT handleType, SQLHANDLE handle, Persistent<Function> cb);

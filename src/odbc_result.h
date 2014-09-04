@@ -90,10 +90,10 @@ class ODBCResult : public node::ObjectWrap {
       Persistent<Object> resultBuffer; // Used for keeping the buffer alive
       void* resultBufferContents;
       size_t resultBufferOffset;
-      size_t resultBufferLength;
+      SQLLEN resultBufferLength;
 
-      SQLINTEGER bytesAvailable;
-      SQLINTEGER bytesRead;
+      SQLLEN bytesAvailable;
+      SQLLEN bytesRead;
 
     };
     

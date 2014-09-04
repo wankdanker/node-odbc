@@ -370,7 +370,7 @@ SQLSMALLINT ODBC::GetCColumnType(const Column& column) {
 }
 
 SQLRETURN ODBC::GetColumnData( SQLHSTMT hStmt, const Column& column, 
-                               void* buffer, int bufferLength, SQLSMALLINT& cType, SQLINTEGER& len) {
+                               void* buffer, SQLLEN bufferLength, SQLSMALLINT& cType, SQLLEN& len) {
 
   cType = GetCColumnType(column);
 
@@ -457,16 +457,16 @@ Handle<Value> ODBC::ConvertColumnValue( SQLSMALLINT cType,
 }
 
 SQLRETURN ODBC::FetchMoreData( SQLHSTMT hStmt, const Column& column, SQLSMALLINT cType,
-                               SQLINTEGER& bytesAvailable, SQLINTEGER& bytesRead,
-                               void* internalBuffer, SQLINTEGER internalBufferLength,
-                               void* resultBuffer, size_t& offset, int resultBufferLength ) {
+                               SQLLEN& bytesAvailable, SQLLEN& bytesRead,
+                               void* internalBuffer, SQLLEN internalBufferLength,
+                               void* resultBuffer, size_t& offset, SQLLEN resultBufferLength ) {
 
   bytesRead = 0;
   SQLRETURN ret;
 
   if (resultBuffer) {
     // Just use the node::Buffer we have to avoid memcpy()ing
-    SQLINTEGER remainingBuffer = resultBufferLength - offset;
+    SQLLEN remainingBuffer = resultBufferLength - offset;
     ret = GetColumnData(hStmt, column, (char*)resultBuffer + offset, remainingBuffer, cType, bytesAvailable); 
     if (!SQL_SUCCEEDED(ret) || bytesAvailable == SQL_NULL_DATA)
       return ret;
@@ -509,7 +509,7 @@ SQLRETURN ODBC::FetchMoreData( SQLHSTMT hStmt, const Column& column, SQLSMALLINT
 }
 
 Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column, 
-                                    uint16_t* buffer, int bufferLength,
+                                    uint16_t* buffer, SQLLEN bufferLength,
                                     bool partial, bool fetch) {
   HandleScope scope;
 
@@ -526,7 +526,7 @@ Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
 
   // Fixed length column
   if (cType != SQL_C_BINARY && cType != SQL_C_TCHAR) {
-    SQLINTEGER bytesAvailable = 0, bytesRead = 0;
+    SQLLEN bytesAvailable = 0, bytesRead = 0;
 
     if (fetch) {
         // Use the ODBCResult's buffer
@@ -555,7 +555,7 @@ Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
   size_t offset = 0;
   
   SQLRETURN ret = 0; 
-  SQLINTEGER bytesAvailable = 0, bytesRead = 0;
+  SQLLEN bytesAvailable = 0, bytesRead = 0;
 
   do {
     if (fetch) {
@@ -597,7 +597,7 @@ Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
 }
 
 Handle<Value> ODBC::InterpretBuffers( SQLSMALLINT cType, 
-                                      void* internalBuffer, SQLINTEGER bytesRead, 
+                                      void* internalBuffer, SQLLEN bytesRead, 
                                       Handle<Object> resultBufferHandle, 
                                       void* resultBuffer, size_t resultBufferOffset) {
   DEBUG_PRINTF("ODBC::InterpretBuffers(%i, %p, %i, _, %p, %u)\n", cType, internalBuffer, bytesRead, resultBuffer, resultBufferOffset);
