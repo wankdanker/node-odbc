@@ -572,6 +572,9 @@ Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
     // Maybe this should be an error?
     if (ret == SQL_NO_DATA)
       return scope.Close(Undefined());
+    
+    if (bytesAvailable == SQL_NULL_DATA)
+      return scope.Close(Null());
 
     if (!SQL_SUCCEEDED(ret))
       return ThrowException(ODBC::GetSQLError(SQL_HANDLE_STMT, hStmt, "ODBC::GetColumnValue: Error getting data for result column"));
