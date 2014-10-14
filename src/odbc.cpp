@@ -393,6 +393,50 @@ SQLRETURN ODBC::GetColumnData( SQLHSTMT hStmt, const Column& column,
       &len);
 }
 
+#if defined(WIN32)
+double SQLTimeToV8Time(SQL_TIMESTAMP_STRUCT odbcTime) {
+  SYSTEMTIME systemTime = {
+    odbcTime.year, odbcTime.month, 0, odbcTime.day,
+    odbcTime.hour, odbcTime.minute, odbcTime.second,
+    odbcTime.fraction / 1000000 // wMilliseconds
+  };
+  FILETIME fileTime;
+  
+  if(!SystemTimeToFileTime(&systemTime, &fileTime))
+    return 0;
+
+  LARGE_INTEGER ll;
+  ll.LowPart = fileTime.dwLowDateTime;
+  ll.HighPart = fileTime.dwHighDateTime;
+
+  return double(ll.QuadPart - 116444736000000000I64) / 10000; // 100ns intervals to 1ms intervals
+}
+#else
+double SQLTimeToV8Time(SQL_TIMESTAMP_STRUCT odbcTime) {
+  struct tm timeInfo = { 0 };
+  SQLUINTEGER fraction = 0;
+  
+  timeInfo.tm_year = odbcTime.year - 1900;
+  timeInfo.tm_mon = odbcTime.month - 1;
+  timeInfo.tm_mday = odbcTime.day;
+  timeInfo.tm_hour = odbcTime.hour;
+  timeInfo.tm_min = odbcTime.minute;
+  timeInfo.tm_sec = odbcTime.second;
+  fraction = odbcTime.fraction;
+  
+  //a negative value means that mktime() should use timezone information 
+  //and system databases to attempt to determine whether DST is in effect 
+  //at the specified time.
+  timeInfo.tm_isdst = -1;
+      
+#  if defined(TIMEGM)
+  return (double(timegm(&timeInfo)) * 1000) + (fraction / 1000000.0);
+#  else
+  return (double(timelocal(&timeInfo)) * 1000) + (fraction / 1000000.0);
+#  endif
+}
+#endif
+
 Handle<Value> ODBC::ConvertColumnValue( SQLSMALLINT cType,
                                         uint16_t* buffer, SQLINTEGER bytesInBuffer,
                                         Buffer* resultBuffer, size_t resultBufferOffset) {
@@ -411,39 +455,10 @@ Handle<Value> ODBC::ConvertColumnValue( SQLSMALLINT cType,
       break;
 
     case SQL_C_TYPE_TIMESTAMP: {
-      struct tm timeInfo = { 0 };
-      SQLUINTEGER fraction = 0;
-
       assert(bytesInBuffer >= sizeof(SQL_TIMESTAMP_STRUCT));
       SQL_TIMESTAMP_STRUCT& odbcTime = *reinterpret_cast<SQL_TIMESTAMP_STRUCT*>(buffer);
 
-      timeInfo.tm_year = odbcTime.year - 1900;
-      timeInfo.tm_mon = odbcTime.month - 1;
-      timeInfo.tm_mday = odbcTime.day;
-      timeInfo.tm_hour = odbcTime.hour;
-      timeInfo.tm_min = odbcTime.minute;
-      timeInfo.tm_sec = odbcTime.second;
-      fraction = odbcTime.fraction;
-
-      //a negative value means that mktime() should use timezone information 
-      //and system databases to attempt to determine whether DST is in effect 
-      //at the specified time.
-      timeInfo.tm_isdst = -1;
-
-#if defined(_WIN32) && defined (TIMEGM)
-      return scope.Close(Date::New((double(_mkgmtime32(&timeInfo)) * 1000)
-        + (fraction / 1000000.0)));
-#elif defined(WIN32)
-      return scope.Close(Date::New((double(mktime(&timeInfo)) * 1000)
-        + (fraction / 1000000.0)));
-#elif defined(TIMEGM)
-      return scope.Close(Date::New((double(timegm(&timeInfo)) * 1000)
-        + (fraction / 1000000.0)));
-#else
-      return scope.Close(Date::New((double(timelocal(&timeInfo)) * 1000)
-        + (fraction / 1000000.0)));
-#endif
-      break;
+      return scope.Close(Date::New(SQLTimeToV8Time(odbcTime)));
     }
 
     case SQL_C_BIT:
