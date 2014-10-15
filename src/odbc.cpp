@@ -395,20 +395,38 @@ SQLRETURN ODBC::GetColumnData( SQLHSTMT hStmt, const Column& column,
 
 #if defined(WIN32)
 double SQLTimeToV8Time(SQL_TIMESTAMP_STRUCT odbcTime) {
-  SYSTEMTIME systemTime = {
+  SYSTEMTIME time = {
     odbcTime.year, odbcTime.month, 0, odbcTime.day,
     odbcTime.hour, odbcTime.minute, odbcTime.second,
     odbcTime.fraction / 1000000 // wMilliseconds
   };
   FILETIME fileTime;
   
-  if(!SystemTimeToFileTime(&systemTime, &fileTime))
-    return 0;
+  // Date::New expects UTC. If TIMEGM is not set, we need to convert
+  // from local time to UTC before passing to Date::New().
+  // 
+  // First, do any time zone conversion, then convert system time to
+  // file time (the number of 100-nanosecond intervals since 1/1/1601 UTC).
+  
+# if defined(TIMEGM)
+    if (!SystemTimeToFileTime(&time, &fileTime))
+      return 0;
+#  else
+    // Time is local time, convert to UTC first.
+    SYSTEMTIME utcTime;
+    if (!TzSpecificLocalTimeToSystemTime(NULL, &time, &utcTime))
+      return 0;
+    if (!SystemTimeToFileTime(&utcTime, &fileTime))
+      return 0;
+#  endif 
 
+  // This is way MSDN recommends converting a FILETIME to a 64-bit integer. Using
+  // signed integer types here to allow dates before 1/1/1970.
   LARGE_INTEGER ll;
   ll.LowPart = fileTime.dwLowDateTime;
   ll.HighPart = fileTime.dwHighDateTime;
 
+  // 116444736000000000I64 is the epoch as a FILETIME (1/1/1970)
   return double(ll.QuadPart - 116444736000000000I64) / 10000; // 100ns intervals to 1ms intervals
 }
 #else
