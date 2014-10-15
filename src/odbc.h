@@ -20,6 +20,7 @@
 
 #include <v8.h>
 #include <node.h>
+#include <node_buffer.h>
 #include <wchar.h>
 
 #include <stdlib.h>
@@ -50,8 +51,8 @@ using namespace node;
 #define MODE_CALLBACK_FOR_EACH 2
 #define FETCH_ARRAY 3
 #define FETCH_OBJECT 4
+#define FETCH_NONE 5
 #define SQL_DESTROY 9999
-
 
 typedef struct {
   unsigned char *name;
@@ -79,7 +80,12 @@ class ODBC : public node::ObjectWrap {
     static void Init(v8::Handle<Object> target);
     static Column* GetColumns(SQLHSTMT hStmt, short* colCount);
     static void FreeColumns(Column* columns, short* colCount);
-    static Handle<Value> GetColumnValue(SQLHSTMT hStmt, Column column, uint16_t* buffer, int bufferLength);
+    static SQLRETURN GetCColumnType(const Column& column);
+    static SQLRETURN GetColumnData(SQLHSTMT hStmt, const Column& column, void* buffer, SQLLEN bufferLength, SQLSMALLINT& cType, SQLLEN& len);
+    static Handle<Value> ConvertColumnValue(SQLSMALLINT cType, uint16_t* buffer, SQLINTEGER bytesInBuffer, node::Buffer* resultBuffer, size_t resultBufferOffset);
+    static SQLRETURN FetchMoreData(SQLHSTMT hStmt, const Column& column, SQLSMALLINT cType, SQLLEN& bytesAvailable, SQLLEN& bytesRead, void* internalBuffer, SQLLEN internalBufferLength, void* resultBuffer, size_t& offset, SQLLEN resultBufferLength);
+    static Handle<Value> InterpretBuffers(SQLSMALLINT cType, void* internalBuffer, SQLLEN bytesRead, Handle<Object> resultBufferHandle, void* resultBuffer, size_t resultBufferOffset);
+    static Handle<Value> GetColumnValue(SQLHSTMT hStmt, Column column, uint16_t* buffer, SQLLEN bufferLength, bool partial = false, bool fetch = true);
     static Local<Object> GetRecordTuple (SQLHSTMT hStmt, Column* columns, short* colCount, uint16_t* buffer, int bufferLength);
     static Handle<Value> GetRecordArray (SQLHSTMT hStmt, Column* columns, short* colCount, uint16_t* buffer, int bufferLength);
     static Handle<Value> CallbackSQLError (SQLSMALLINT handleType, SQLHANDLE handle, Persistent<Function> cb);
@@ -154,9 +160,9 @@ struct query_request {
 };
 
 #ifdef UNICODE
-    #define SQL_T(x) (L##x)
+    #define SQL_T(x) L##x
 #else
-    #define SQL_T(x) (x)
+    #define SQL_T(x) x
 #endif
 
 #ifdef DEBUG
@@ -176,6 +182,13 @@ struct query_request {
   if (args.Length() < (N))                                              \
     return ThrowException(Exception::TypeError(                         \
                                                String::New("Expected " #N "arguments")));
+
+//Require Integer Argument
+#define REQ_INT32_ARG(I, VAR)                                             \
+  if (args.Length() <= (I) || !args[I]->IsInt32())                     \
+    return ThrowException(Exception::TypeError(                         \
+                                               String::New("Argument " #I " must be an integer"))); \
+  int VAR(args[I]->Int32Value());
 
 //Require String Argument; Save String as Utf8
 #define REQ_STR_ARG(I, VAR)                                             \
@@ -248,5 +261,23 @@ struct query_request {
                                                String::New("Argument " #I " must be an integer"))); \
   }
 
+// For non-Windows?
+#ifndef TCHAR
+#ifdef UNICODE
+#define TCHAR wchar_t
+#else
+#define TCHAR char
+#endif
+#endif
+
+template <class T>
+inline const T& min(const T& x, const T& y) {
+  return !(y < x) ? x : y;
+}
+
+template <class T>
+inline const T& max(const T& x, const T& y) {
+  return x < y ? y : x;
+}
 
 #endif

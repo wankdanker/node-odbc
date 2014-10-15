@@ -18,6 +18,7 @@
 #include <v8.h>
 #include <node.h>
 #include <node_version.h>
+#include <node_buffer.h>
 #include <time.h>
 #include <uv.h>
 
@@ -49,12 +50,14 @@ void ODBCResult::Init(v8::Handle<Object> target) {
   // Prototype Methods
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "fetchAll", FetchAll);
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "fetch", Fetch);
+  NODE_SET_PROTOTYPE_METHOD(constructor_template, "getColumnValue", GetColumnValue);
 
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "moreResultsSync", MoreResultsSync);
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "closeSync", CloseSync);
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "fetchSync", FetchSync);
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "fetchAllSync", FetchAllSync);
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "getColumnNamesSync", GetColumnNamesSync);
+  NODE_SET_PROTOTYPE_METHOD(constructor_template, "getColumnValueSync", GetColumnValueSync);
 
   // Properties
   instance_template->SetAccessor(String::New("fetchMode"), FetchModeGetter, FetchModeSetter);
@@ -119,7 +122,7 @@ Handle<Value> ODBCResult::New(const Arguments& args) {
   delete canFreeHandle;
 
   //specify the buffer length
-  objODBCResult->bufferLength = MAX_VALUE_SIZE - 1;
+  objODBCResult->bufferLength = MAX_VALUE_SIZE + (MAX_VALUE_SIZE % 2); // Ensure even so GetColumnValue doesn't break
   
   //initialze a buffer for this object
   objODBCResult->buffer = (uint16_t *) malloc(objODBCResult->bufferLength + 1);
@@ -257,7 +260,7 @@ void ODBCResult::UV_AfterFetch(uv_work_t* work_req, int status) {
   }
 
   if (moreWork) {
-    Handle<Value> args[2];
+    Handle<Value> args[3];
 
     args[0] = Null();
     if (data->fetchMode == FETCH_ARRAY) {
@@ -268,7 +271,7 @@ void ODBCResult::UV_AfterFetch(uv_work_t* work_req, int status) {
         data->objResult->buffer,
         data->objResult->bufferLength);
     }
-    else {
+    else if (data->fetchMode == FETCH_OBJECT) {
       args[1] = ODBC::GetRecordTuple(
         data->objResult->m_hSTMT,
         data->objResult->columns,
@@ -276,10 +279,15 @@ void ODBCResult::UV_AfterFetch(uv_work_t* work_req, int status) {
         data->objResult->buffer,
         data->objResult->bufferLength);
     }
+    else {
+      args[1] = Null();
+    }
+
+    args[2] = True();
 
     TryCatch try_catch;
 
-    data->cb->Call(Context::GetCurrent()->Global(), 2, args);
+    data->cb->Call(Context::GetCurrent()->Global(), 3, args);
     data->cb.Dispose();
 
     if (try_catch.HasCaught()) {
@@ -289,7 +297,7 @@ void ODBCResult::UV_AfterFetch(uv_work_t* work_req, int status) {
   else {
     ODBC::FreeColumns(data->objResult->columns, &data->objResult->colCount);
     
-    Handle<Value> args[2];
+    Handle<Value> args[3];
     
     //if there was an error, pass that as arg[0] otherwise Null
     if (error) {
@@ -300,10 +308,11 @@ void ODBCResult::UV_AfterFetch(uv_work_t* work_req, int status) {
     }
     
     args[1] = Null();
+    args[2] = False();
 
     TryCatch try_catch;
 
-    data->cb->Call(Context::GetCurrent()->Global(), 2, args);
+    data->cb->Call(Context::GetCurrent()->Global(), 3, args);
     data->cb.Dispose();
 
     if (try_catch.HasCaught()) {
@@ -381,13 +390,15 @@ Handle<Value> ODBCResult::FetchSync(const Arguments& args) {
         objResult->buffer,
         objResult->bufferLength);
     }
-    else {
+    else if (fetchMode == FETCH_OBJECT) {
       data = ODBC::GetRecordTuple(
         objResult->m_hSTMT,
         objResult->columns,
         &objResult->colCount,
         objResult->buffer,
         objResult->bufferLength);
+    } else {
+      data = Null();
     }
     
     return scope.Close(data);
@@ -521,7 +532,7 @@ void ODBCResult::UV_AfterFetchAll(uv_work_t* work_req, int status) {
           self->bufferLength)
       );
     }
-    else {
+    else if (data->fetchMode == FETCH_OBJECT) {
       data->rows->Set(
         Integer::New(data->count), 
         ODBC::GetRecordTuple(
@@ -637,28 +648,24 @@ Handle<Value> ODBCResult::FetchAllSync(const Arguments& args) {
         break;
       }
 
-      if (fetchMode == FETCH_ARRAY) {
-        rows->Set(
-          Integer::New(count), 
+      Handle<Value> value;
+      if (fetchMode == FETCH_ARRAY)
+        value = 
           ODBC::GetRecordArray(
             self->m_hSTMT,
             self->columns,
             &self->colCount,
             self->buffer,
-            self->bufferLength)
-        );
-      }
-      else {
-        rows->Set(
-          Integer::New(count), 
-          ODBC::GetRecordTuple(
+            self->bufferLength);
+      else if (fetchMode == FETCH_OBJECT)
+        value = ODBC::GetRecordTuple(
             self->m_hSTMT,
             self->columns,
             &self->colCount,
             self->buffer,
-            self->bufferLength)
-        );
-      }
+            self->bufferLength);
+
+      rows->Set(Integer::New(count), value);
       count++;
     }
   }
@@ -752,4 +759,186 @@ Handle<Value> ODBCResult::GetColumnNamesSync(const Arguments& args) {
   }
     
   return scope.Close(cols);
+}
+
+/*
+ * GetColumnValue
+ */
+
+Handle<Value> ODBCResult::GetColumnValue(const Arguments& args) {
+  DEBUG_PRINTF("ODBCResult::GetColumnValue\n");
+  
+  HandleScope scope;
+  
+  ODBCResult* objODBCResult = ObjectWrap::Unwrap<ODBCResult>(args.Holder());
+  
+  if (!objODBCResult->columns)
+    return ThrowException(Exception::Error(String::New("ODBCResult::GetColumnValue(): There are currently no columns. You must call Fetch() before calling GetColumnValue().")));
+
+  REQ_INT32_ARG(0, col);
+  if (col < 0 || col > objODBCResult->colCount)
+    return ThrowException(Exception::RangeError(String::New("ODBCResult::GetColumnValue(): The column index is invalid.")));
+
+  uv_work_t* work_req = (uv_work_t *) (calloc(1, sizeof(uv_work_t)));
+  get_column_value_work_data* data = (get_column_value_work_data *) calloc(1, sizeof(get_column_value_work_data));
+  
+  int maxBytes;
+  Local<Function> cb;
+
+  if (args.Length() == 3) {
+    REQ_INT32_ARG(1, tmpMaxBytes); maxBytes = tmpMaxBytes;
+    REQ_FUN_ARG(2, tmpCB); cb = tmpCB;
+  } else if (args.Length() == 2) {
+    REQ_FUN_ARG(1, tmpCB); cb = tmpCB;
+    maxBytes = 0; // Not a partial request
+  }
+
+  data->col = col;
+  data->bytesRequested = maxBytes;
+  data->cb = Persistent<Function>::New(cb);
+  data->objResult = objODBCResult;
+  data->resultBufferContents = 0;
+  data->resultBufferOffset = 0;
+  data->resultBufferLength = 0;
+  work_req->data = data;
+
+  uv_queue_work(
+    uv_default_loop(), 
+    work_req, 
+    UV_GetColumnValue, 
+    (uv_after_work_cb)UV_AfterGetColumnValue);
+  
+  objODBCResult->Ref();
+
+  return scope.Close(Undefined());
+}
+
+void ODBCResult::UV_GetColumnValue(uv_work_t* work_req) {
+  DEBUG_PRINTF("ODBCResult::UV_GetColumnValue\n");
+  
+  get_column_value_work_data* data = (get_column_value_work_data*)(work_req->data);
+  
+  SQLLEN bytesRequested = data->bytesRequested;
+  if (bytesRequested <= 0 || bytesRequested > data->objResult->bufferLength)
+    bytesRequested = data->objResult->bufferLength;
+  
+  data->cType = ODBC::GetCColumnType(data->objResult->columns[data->col]);
+  
+  data->result = ODBC::FetchMoreData(
+    data->objResult->m_hSTMT,
+    data->objResult->columns[data->col],
+    data->cType,
+    data->bytesAvailable,
+    data->bytesRead,
+    data->objResult->buffer, bytesRequested,
+    data->resultBufferContents, data->resultBufferOffset, data->resultBufferLength);
+}
+
+void ODBCResult::UV_AfterGetColumnValue(uv_work_t* work_req, int status) {
+  DEBUG_PRINTF("ODBCResult::UV_AfterGetColumnValue\n");
+  
+  HandleScope scope;
+  
+  get_column_value_work_data* data = (get_column_value_work_data*)(work_req->data);
+  
+  SQLRETURN ret = data->result;
+
+  DEBUG_PRINTF("ODBCResult::UV_AfterGetColumnValue: ret=%i, cType=%i, bytesRequested=%i, bytesRead=%i\n", ret, data->cType, data->bytesRequested, data->bytesRead);
+
+  Handle<Value> args[3];
+  int argc = 3;
+
+  if (!SQL_SUCCEEDED(ret)) {
+    args[0] = ODBC::GetSQLError(SQL_HANDLE_STMT, data->objResult->m_hSTMT, "[node-odbc] Error in ODBCResult::GetColumnValue");
+    argc = 1;
+  } else if (data->bytesRead == SQL_NULL_DATA) {
+    args[0] = Null();
+    args[1] = Null();
+    args[2] = False();
+  } else if (data->cType != SQL_C_BINARY && data->cType != SQL_C_TCHAR) {
+    args[0] = Null();
+    args[1] = ODBC::ConvertColumnValue(data->cType, data->objResult->buffer, data->bytesRead, 0, 0);
+    args[2] = False();
+  } else if (data->bytesRequested == 0 && data->result == SQL_SUCCESS_WITH_INFO) {
+    // Not partial request, and there is more data to fetch ... queue some more work
+    
+    if (!data->resultBufferContents) {
+      Buffer* b = Buffer::New(data->bytesAvailable + (data->cType == SQL_C_TCHAR ? sizeof(TCHAR) : 0)); // Allow space for ODBC to add an unnecessary null terminator
+      memcpy(Buffer::Data(b), data->objResult->buffer, data->bytesRead);
+      data->resultBuffer = b->handle_;
+      data->resultBufferOffset = data->bytesRead;
+      data->resultBufferContents = Buffer::Data(b);
+      data->resultBufferLength = Buffer::Length(b);
+      DEBUG_PRINTF(" *** Created new SlowBuffer (length: %i), copied %i bytes from internal buffer\n", Buffer::Length(b), data->bytesRead);
+    }
+
+    uv_queue_work(
+      uv_default_loop(), 
+      work_req, 
+      UV_GetColumnValue, 
+      (uv_after_work_cb)UV_AfterGetColumnValue);
+    
+    return;
+  } else {
+    if (!data->resultBufferContents && data->cType == SQL_C_BINARY) {
+      Buffer* b = Buffer::New((const char*)data->objResult->buffer, (size_t)data->bytesRead);
+      data->resultBuffer = b->handle_;
+      data->resultBufferOffset = data->bytesRead;
+      data->resultBufferContents = Buffer::Data(b);
+      data->resultBufferLength = Buffer::Length(b);
+      DEBUG_PRINTF(" *** Created new SlowBuffer (length: %i), copied %i bytes from internal buffer\n", Buffer::Length(b), data->bytesRead);
+    }
+
+    args[0] = Null();
+    args[1] = ODBC::InterpretBuffers(data->cType, data->objResult->buffer, data->bytesRead, data->resultBuffer, data->resultBufferContents, data->resultBufferOffset);
+    args[2] = ret == SQL_SUCCESS_WITH_INFO ? True() : False();
+  }
+  
+  TryCatch try_catch;
+  
+  DEBUG_PRINTF("Calling callback\n");
+
+  data->cb->Call(Context::GetCurrent()->Global(), argc, args);
+
+  DEBUG_PRINTF("Called callback, hasCaught=%i\n", try_catch.HasCaught() ? 1 : 0);
+
+  data->cb.Dispose();
+  if (data->resultBufferContents)
+    data->resultBuffer.Dispose();
+
+  if (try_catch.HasCaught()) {
+    FatalException(try_catch);
+  }
+
+  free(data);
+  free(work_req);
+  
+  data->objResult->Unref();
+}
+
+Handle<Value> ODBCResult::GetColumnValueSync(const Arguments& args) {
+  DEBUG_PRINTF("ODBCResult::GetColumnValueSync\n");
+
+  HandleScope scope;
+
+  ODBCResult* objODBCResult = ObjectWrap::Unwrap<ODBCResult>(args.Holder()); 
+  
+  REQ_INT32_ARG(0, col);
+  if (col < 0 || col >= objODBCResult->colCount)
+    return ThrowException(Exception::RangeError(
+      String::New("ODBCResult::GetColumnValueSync(): The column index requested is invalid.")
+    ));
+
+  bool partial = true;
+  OPT_INT_ARG(1, maxBytes, 0);
+  if (maxBytes == 0) {
+    partial = false;
+    maxBytes = objODBCResult->bufferLength;
+  }
+
+  DEBUG_PRINTF("ODBCResult::GetColumnValueSync: columns=0x%x, colCount=%i, column=%i, maxBytes=%i\n", objODBCResult->columns, objODBCResult->colCount, col, maxBytes);
+
+  return scope.Close(
+    ODBC::GetColumnValue(objODBCResult->m_hSTMT, objODBCResult->columns[col], objODBCResult->buffer, maxBytes, true)
+  );
 }

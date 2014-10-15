@@ -18,6 +18,7 @@
 #include <string.h>
 #include <v8.h>
 #include <node.h>
+#include <node_buffer.h>
 #include <node_version.h>
 #include <time.h>
 #include <uv.h>
@@ -29,10 +30,6 @@
 
 #ifdef dynodbc
 #include "dynodbc.h"
-#endif
-
-#ifdef _WIN32
-#include "strptime.h"
 #endif
 
 using namespace v8;
@@ -65,6 +62,7 @@ void ODBC::Init(v8::Handle<Object> target) {
   NODE_DEFINE_CONSTANT(constructor_template, SQL_DESTROY); //SQL_DESTROY is non-standard
   NODE_DEFINE_CONSTANT(constructor_template, FETCH_ARRAY);
   NODE_DEFINE_CONSTANT(constructor_template, FETCH_OBJECT);
+  NODE_DEFINE_CONSTANT(constructor_template, FETCH_NONE);
   
   // Prototype Methods
   NODE_SET_PROTOTYPE_METHOD(constructor_template, "createConnection", CreateConnection);
@@ -309,7 +307,7 @@ Column* ODBC::GetColumns(SQLHSTMT hStmt, short* colCount) {
                            (SQLSMALLINT) MAX_FIELD_SIZE,
                            (SQLSMALLINT *) &buflen,
                            NULL);
-    
+
     //store the len attribute
     columns[i].len = buflen;
     
@@ -331,6 +329,8 @@ Column* ODBC::GetColumns(SQLHSTMT hStmt, short* colCount) {
  */
 
 void ODBC::FreeColumns(Column* columns, short* colCount) {
+  DEBUG_PRINTF("ODBC::FreeColumns(0x%x, %i)\n", columns, (int)*colCount);
+
   for(int i = 0; i < *colCount; i++) {
       delete [] columns[i].name;
   }
@@ -344,269 +344,325 @@ void ODBC::FreeColumns(Column* columns, short* colCount) {
  * GetColumnValue
  */
 
-Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column, 
-                                        uint16_t* buffer, int bufferLength) {
-  HandleScope scope;
-  SQLLEN len = 0;
+SQLSMALLINT ODBC::GetCColumnType(const Column& column) {
+  switch ((int)column.type) {
+    case SQL_INTEGER: case SQL_SMALLINT: case SQL_TINYINT:
+      return SQL_C_SLONG;
 
-  //reset the buffer
+    case SQL_NUMERIC: case SQL_DECIMAL: case SQL_BIGINT:
+    case SQL_FLOAT: case SQL_REAL: case SQL_DOUBLE:
+      return SQL_C_DOUBLE;
+
+    // Date and time
+    case SQL_TIMESTAMP: case SQL_TYPE_TIMESTAMP:
+    case SQL_DATE: case SQL_TYPE_DATE:
+      return SQL_C_TYPE_TIMESTAMP;
+
+    case SQL_BINARY: case SQL_VARBINARY: case SQL_LONGVARBINARY:
+      return SQL_C_BINARY;
+
+    case SQL_BIT:
+      return SQL_C_BIT;
+
+    default:
+      return SQL_C_TCHAR;
+  }
+}
+
+SQLRETURN ODBC::GetColumnData( SQLHSTMT hStmt, const Column& column, 
+                               void* buffer, SQLLEN bufferLength, SQLSMALLINT& cType, SQLLEN& len) {
+
+  cType = GetCColumnType(column);
+
+  switch(cType) {
+    case SQL_C_SLONG:
+      bufferLength = sizeof(SQLINTEGER);
+      break;
+    
+    case SQL_C_DOUBLE:
+      bufferLength = sizeof(SQLDOUBLE);
+      break;
+  }
+
+  return SQLGetData(
+      hStmt,
+      column.index,
+      cType,
+      buffer,
+      bufferLength,
+      &len);
+}
+
+#if defined(WIN32)
+double SQLTimeToV8Time(SQL_TIMESTAMP_STRUCT odbcTime) {
+  SYSTEMTIME time = {
+    odbcTime.year, odbcTime.month, 0, odbcTime.day,
+    odbcTime.hour, odbcTime.minute, odbcTime.second,
+    odbcTime.fraction / 1000000 // wMilliseconds
+  };
+  FILETIME fileTime;
+  
+  // Date::New expects UTC. If TIMEGM is not set, we need to convert
+  // from local time to UTC before passing to Date::New().
+  // 
+  // First, do any time zone conversion, then convert system time to
+  // file time (the number of 100-nanosecond intervals since 1/1/1601 UTC).
+  
+# if defined(TIMEGM)
+    if (!SystemTimeToFileTime(&time, &fileTime))
+      return 0;
+#  else
+    // Time is local time, convert to UTC first.
+    SYSTEMTIME utcTime;
+    if (!TzSpecificLocalTimeToSystemTime(NULL, &time, &utcTime))
+      return 0;
+    if (!SystemTimeToFileTime(&utcTime, &fileTime))
+      return 0;
+#  endif 
+
+  // This is way MSDN recommends converting a FILETIME to a 64-bit integer. Using
+  // signed integer types here to allow dates before 1/1/1970.
+  LARGE_INTEGER ll;
+  ll.LowPart = fileTime.dwLowDateTime;
+  ll.HighPart = fileTime.dwHighDateTime;
+
+  // 116444736000000000I64 is the epoch as a FILETIME (1/1/1970)
+  return double(ll.QuadPart - 116444736000000000I64) / 10000; // 100ns intervals to 1ms intervals
+}
+#else
+double SQLTimeToV8Time(SQL_TIMESTAMP_STRUCT odbcTime) {
+  struct tm timeInfo = { 0 };
+  SQLUINTEGER fraction = 0;
+  
+  timeInfo.tm_year = odbcTime.year - 1900;
+  timeInfo.tm_mon = odbcTime.month - 1;
+  timeInfo.tm_mday = odbcTime.day;
+  timeInfo.tm_hour = odbcTime.hour;
+  timeInfo.tm_min = odbcTime.minute;
+  timeInfo.tm_sec = odbcTime.second;
+  fraction = odbcTime.fraction;
+  
+  //a negative value means that mktime() should use timezone information 
+  //and system databases to attempt to determine whether DST is in effect 
+  //at the specified time.
+  timeInfo.tm_isdst = -1;
+      
+#  if defined(TIMEGM)
+  return (double(timegm(&timeInfo)) * 1000) + (fraction / 1000000.0);
+#  else
+  return (double(timelocal(&timeInfo)) * 1000) + (fraction / 1000000.0);
+#  endif
+}
+#endif
+
+Handle<Value> ODBC::ConvertColumnValue( SQLSMALLINT cType,
+                                        uint16_t* buffer, SQLINTEGER bytesInBuffer,
+                                        Buffer* resultBuffer, size_t resultBufferOffset) {
+
+  HandleScope scope;
+
+  switch (cType) {
+    case SQL_C_SLONG:
+      assert(bytesInBuffer >= sizeof(SQLINTEGER));
+      return scope.Close(Integer::New(*reinterpret_cast<SQLINTEGER*>(buffer)));
+      break;
+
+    case SQL_C_DOUBLE:
+      assert(bytesInBuffer >= sizeof(SQLDOUBLE));
+      return scope.Close(Number::New(*reinterpret_cast<SQLDOUBLE*>(buffer)));
+      break;
+
+    case SQL_C_TYPE_TIMESTAMP: {
+      assert(bytesInBuffer >= sizeof(SQL_TIMESTAMP_STRUCT));
+      SQL_TIMESTAMP_STRUCT& odbcTime = *reinterpret_cast<SQL_TIMESTAMP_STRUCT*>(buffer);
+
+      return scope.Close(Date::New(SQLTimeToV8Time(odbcTime)));
+    }
+
+    case SQL_C_BIT:
+      assert(bytesInBuffer >= sizeof(SQLCHAR));
+      return scope.Close(Boolean::New(!!*reinterpret_cast<SQLCHAR*>(buffer)));
+
+    default:
+      assert(!"ODBC::ConvertColumnValue: Internal error (unexpected C type)");
+  }
+}
+
+SQLRETURN ODBC::FetchMoreData( SQLHSTMT hStmt, const Column& column, SQLSMALLINT cType,
+                               SQLLEN& bytesAvailable, SQLLEN& bytesRead,
+                               void* internalBuffer, SQLLEN internalBufferLength,
+                               void* resultBuffer, size_t& offset, SQLLEN resultBufferLength ) {
+
+  bytesRead = 0;
+  SQLRETURN ret;
+
+  if (resultBuffer) {
+    // Just use the node::Buffer we have to avoid memcpy()ing
+    SQLLEN remainingBuffer = resultBufferLength - offset;
+    ret = GetColumnData(hStmt, column, (char*)resultBuffer + offset, remainingBuffer, cType, bytesAvailable); 
+    if (!SQL_SUCCEEDED(ret) || bytesAvailable == SQL_NULL_DATA)
+      return ret;
+
+    bytesRead = min(bytesAvailable, remainingBuffer);
+
+    if (cType == SQL_C_TCHAR && bytesRead == remainingBuffer)
+      bytesRead -= sizeof(TCHAR); // The last byte or two bytes of the buffer is actually a null terminator (gee, thanks, ODBC).
+
+    offset += bytesRead;
+          
+    DEBUG_PRINTF("ODBC::FetchMoreData: SQLGetData(slowBuffer, bufferLength=%i): returned %i with %i bytes available\n", 
+      remainingBuffer, ret, bytesAvailable);
+  } else {
+    // We don't know how much data there is to get back yet...
+    // Use our buffer for now for the first SQLGetData call, which will tell us the full length.
+    ret = GetColumnData(hStmt, column, internalBuffer, internalBufferLength, cType, bytesAvailable);
+
+    if (bytesAvailable == SQL_NULL_DATA)
+      bytesRead = bytesAvailable;
+
+    if (!SQL_SUCCEEDED(ret) || bytesAvailable == SQL_NULL_DATA)
+      return ret;
+
+    bytesRead = min(bytesAvailable, internalBufferLength);
+
+    if (cType == SQL_C_TCHAR && bytesRead == internalBufferLength)
+      bytesRead -= sizeof(TCHAR); // The last byte or two bytes of the buffer is actually a null terminator (gee, thanks, ODBC).
+
+    offset += bytesRead;
+
+    DEBUG_PRINTF("ODBC::FetchMoreData: SQLGetData(internalBuffer, bufferLength=%i): returned %i with %i bytes available\n", 
+      internalBufferLength, ret, bytesAvailable);
+
+    // Now would be a good time to create the result buffer, but we can't call 
+    // Buffer::New here if we are on a worker thread
+  }
+
+  return ret;
+}
+
+Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column, 
+                                    uint16_t* buffer, SQLLEN bufferLength,
+                                    bool partial, bool fetch) {
+  HandleScope scope;
+
+  // Reset the buffer
   buffer[0] = '\0';
 
-  //TODO: SQLGetData can supposedly return multiple chunks, need to do this to 
-  //retrieve large fields
-  int ret; 
+  if (!fetch)
+    partial = true;
+
+  DEBUG_PRINTF("ODBC::GetColumnValue: column=%s, type=%i, buffer=%x, bufferLength=%i, partial=%i, fetch=%i\n", 
+    column.name, column.type, buffer, bufferLength, partial?1:0, fetch?1:0);
+
+  SQLSMALLINT cType = GetCColumnType(column);
+
+  // Fixed length column
+  if (cType != SQL_C_BINARY && cType != SQL_C_TCHAR) {
+    SQLLEN bytesAvailable = 0, bytesRead = 0;
+
+    if (fetch) {
+        // Use the ODBCResult's buffer
+        // TODO For fixed-length columns, the driver will just assume the buffer is big enough
+        //      Ensure this won't break anything.
+
+        SQLRETURN ret = GetColumnData(hStmt, column, buffer, bufferLength, cType, bytesAvailable);
+        if (!SQL_SUCCEEDED(ret))
+          return ThrowException(ODBC::GetSQLError(SQL_HANDLE_STMT, hStmt));
+
+        if (bytesAvailable == SQL_NULL_DATA)
+          return scope.Close(Null());
+
+        bytesRead = bytesAvailable > bufferLength ? bufferLength : bytesAvailable;
+        DEBUG_PRINTF(" *** SQLGetData(internalBuffer, bufferLength=%i) for fixed type: returned %i with %i bytes available\n", bufferLength, ret, bytesAvailable);
+
+        return scope.Close(ConvertColumnValue(cType, buffer, bytesRead, 0, 0));
+    } else {
+      return scope.Close(ConvertColumnValue(cType, buffer, bufferLength, 0, 0));
+    }
+  }
   
-  switch ((int) column.type) {
-    case SQL_INTEGER : 
-    case SQL_SMALLINT :
-    case SQL_TINYINT : {
-        long value;
-        
-        ret = SQLGetData(
-          hStmt, 
-          column.index, 
-          SQL_C_SLONG,
-          &value, 
-          sizeof(value), 
-          &len);
-        
-        DEBUG_PRINTF("ODBC::GetColumnValue - Integer: index=%i name=%s type=%i len=%i ret=%i\n", 
-                    column.index, column.name, column.type, len, ret);
-        
-        if (len == SQL_NULL_DATA) {
-          return scope.Close(Null());
-          //return Null();
-        }
-        else {
-          return scope.Close(Integer::New(value));
-          //return Integer::New(value);
-        }
-      }
-      break;
-    case SQL_NUMERIC :
-    case SQL_DECIMAL :
-    case SQL_BIGINT :
-    case SQL_FLOAT :
-    case SQL_REAL :
-    case SQL_DOUBLE : {
-        double value;
-        
-        ret = SQLGetData(
-          hStmt, 
-          column.index, 
-          SQL_C_DOUBLE,
-          &value, 
-          sizeof(value), 
-          &len);
-        
-         DEBUG_PRINTF("ODBC::GetColumnValue - Number: index=%i name=%s type=%i len=%i ret=%i val=%f\n", 
-                    column.index, column.name, column.type, len, ret, value);
-        
-        if (len == SQL_NULL_DATA) {
-          return scope.Close(Null());
-          //return Null();
-        }
-        else {
-          return scope.Close(Number::New(value));
-          //return Number::New(value);
-        }
-      }
-      break;
-    case SQL_DATETIME :
-    case SQL_TIMESTAMP : {
-      //I am not sure if this is locale-safe or cross database safe, but it 
-      //works for me on MSSQL
-#ifdef _WIN32
-      struct tm timeInfo = {};
+  // Varying length column - fetch piece by piece (in as few pieces as possible - fetch the first piece into the 
+  // ODBCResult's buffer to find out how big the column is, then allocate a node::Buffer to hold the rest of it)
+  Buffer* slowBuffer = 0;
+  size_t offset = 0;
+  
+  SQLRETURN ret = 0; 
+  SQLLEN bytesAvailable = 0, bytesRead = 0;
 
-      ret = SQLGetData(
-        hStmt, 
-        column.index, 
-        SQL_C_CHAR,
-        (char *) buffer, 
-        bufferLength, 
-        &len);
+  do {
+    if (fetch) {
+      ret = FetchMoreData(
+        hStmt, column, cType, 
+        bytesAvailable, bytesRead, 
+        buffer, bufferLength, 
+        slowBuffer ? Buffer::Data(slowBuffer) : 0, offset, slowBuffer ? Buffer::Length(slowBuffer) : 0);
+    } else {
+      ret = SQL_SUCCESS;
+      bytesAvailable = bufferLength;
+      bytesRead = bufferLength;
+    }
 
-      DEBUG_PRINTF("ODBC::GetColumnValue - W32 Timestamp: index=%i name=%s type=%i len=%i\n", 
-                    column.index, column.name, column.type, len);
+    // Maybe this should be an error?
+    if (ret == SQL_NO_DATA)
+      return scope.Close(Undefined());
+    
+    if (bytesAvailable == SQL_NULL_DATA)
+      return scope.Close(Null());
 
-      if (len == SQL_NULL_DATA) {
-        return scope.Close(Null());
-        //return Null();
-      }
-      else {
-        strptime((char *) buffer, "%Y-%m-%d %H:%M:%S", &timeInfo);
+    if (!SQL_SUCCEEDED(ret))
+      return ThrowException(ODBC::GetSQLError(SQL_HANDLE_STMT, hStmt, "ODBC::GetColumnValue: Error getting data for result column"));
+    
+    if (slowBuffer)
+      assert(offset <= Buffer::Length(slowBuffer));
+ 
+    // The SlowBuffer is needed when 
+    //  (a) the result type is Binary 
+    //  (b) the result is a string longer than our internal buffer (and we hopefully know the length).
+    // Move data from internal buffer to node::Buffer now.
+    if (!slowBuffer && (ret == SQL_SUCCESS_WITH_INFO || cType == SQL_C_BINARY)) {
+      slowBuffer = Buffer::New(bytesAvailable + (cType == SQL_C_TCHAR ? sizeof(TCHAR) : 0)); // Allow space for ODBC to add an unnecessary null terminator
+      memcpy(Buffer::Data(slowBuffer), buffer, bytesRead);
+      DEBUG_PRINTF(" *** Created new SlowBuffer (length: %i), copied %i bytes from internal buffer\n", Buffer::Length(slowBuffer), bytesRead);
+    }
 
-        //a negative value means that mktime() should use timezone information 
-        //and system databases to attempt to determine whether DST is in effect 
-        //at the specified time.
-        timeInfo.tm_isdst = -1;
-          
-        //return Date::New((double(mktime(&timeInfo)) * 1000));
-        return scope.Close(Date::New((double(mktime(&timeInfo)) * 1000)));
-      }
-#else
-      struct tm timeInfo = { 
-        tm_sec : 0
-        , tm_min : 0
-        , tm_hour : 0
-        , tm_mday : 0
-        , tm_mon : 0
-        , tm_year : 0
-        , tm_wday : 0
-        , tm_yday : 0
-        , tm_isdst : 0
-        , tm_gmtoff : 0
-        , tm_zone : 0
-      };
+  // SQLGetData returns SQL_SUCCESS on the last chunk, SQL_SUCCESS_WITH_INFO and SQLSTATE 01004 on the preceding chunks.
+  } while (!partial && ret == SQL_SUCCESS_WITH_INFO);
 
-      SQL_TIMESTAMP_STRUCT odbcTime;
-      
-      ret = SQLGetData(
-        hStmt, 
-        column.index, 
-        SQL_C_TYPE_TIMESTAMP,
-        &odbcTime, 
-        bufferLength, 
-        &len);
+  return scope.Close(InterpretBuffers(cType, buffer, bytesRead, slowBuffer ? slowBuffer->handle_ : Handle<Object>(), slowBuffer, offset));
+}
 
-      DEBUG_PRINTF("ODBC::GetColumnValue - Unix Timestamp: index=%i name=%s type=%i len=%i\n", 
-                    column.index, column.name, column.type, len);
+Handle<Value> ODBC::InterpretBuffers( SQLSMALLINT cType, 
+                                      void* internalBuffer, SQLLEN bytesRead, 
+                                      Handle<Object> resultBufferHandle, 
+                                      void* resultBuffer, size_t resultBufferOffset) {
+  DEBUG_PRINTF("ODBC::InterpretBuffers(%i, %p, %i, _, %p, %u)\n", cType, internalBuffer, bytesRead, resultBuffer, resultBufferOffset);
 
-      if (len == SQL_NULL_DATA) {
-        return scope.Close(Null());
-        //return Null();
-      }
-      else {
-        timeInfo.tm_year = odbcTime.year - 1900;
-        timeInfo.tm_mon = odbcTime.month - 1;
-        timeInfo.tm_mday = odbcTime.day;
-        timeInfo.tm_hour = odbcTime.hour;
-        timeInfo.tm_min = odbcTime.minute;
-        timeInfo.tm_sec = odbcTime.second;
+  HandleScope scope;
+                                         
+  switch (cType) {
+    case SQL_C_BINARY: {
+      // XXX Can we trust the global Buffer object? What if the caller has set it to something non-Function? Crash?
+      Local<Function> bufferConstructor = Local<Function>::Cast(Context::GetCurrent()->Global()->Get(String::New("Buffer")));
+      Handle<Value> constructorArgs[1] = { resultBufferHandle };
+      return scope.Close(bufferConstructor->NewInstance(1, constructorArgs));
+    }
 
-        //a negative value means that mktime() should use timezone information 
-        //and system databases to attempt to determine whether DST is in effect 
-        //at the specified time.
-        timeInfo.tm_isdst = -1;
-#ifdef TIMEGM
-        return scope.Close(Date::New((double(timegm(&timeInfo)) * 1000)
-                          + (odbcTime.fraction / 1000000)));
-#else
-        return scope.Close(Date::New((double(timelocal(&timeInfo)) * 1000)
-                          + (odbcTime.fraction / 1000000)));
-#endif
-        //return Date::New((double(timegm(&timeInfo)) * 1000) 
-        //                  + (odbcTime.fraction / 1000000));
-      }
-#endif
-    } break;
-    case SQL_BIT :
-      //again, i'm not sure if this is cross database safe, but it works for 
-      //MSSQL
-      ret = SQLGetData(
-        hStmt, 
-        column.index, 
-        SQL_C_CHAR,
-        (char *) buffer, 
-        bufferLength, 
-        &len);
-
-      DEBUG_PRINTF("ODBC::GetColumnValue - Bit: index=%i name=%s type=%i len=%i\n", 
-                    column.index, column.name, column.type, len);
-
-      if (len == SQL_NULL_DATA) {
-        return scope.Close(Null());
-        //return Null();
-      }
-      else {
-        return scope.Close(Boolean::New(( *buffer == '0') ? false : true ));
-        //return Boolean::New(( *buffer == '0') ? false : true );
-      }
-    default :
-      Local<String> str;
-      int count = 0;
-      
-      do {
-        ret = SQLGetData(
-          hStmt,
-          column.index,
-          SQL_C_TCHAR,
-          (char *) buffer,
-          bufferLength,
-          &len);
-
-        DEBUG_PRINTF("ODBC::GetColumnValue - String: index=%i name=%s type=%i len=%i value=%s ret=%i bufferLength=%i\n", 
-                      column.index, column.name, column.type, len,(char *) buffer, ret, bufferLength);
-
-        if (len == SQL_NULL_DATA && str.IsEmpty()) {
-          return scope.Close(Null());
-          //return Null();
-        }
-        
-        if (SQL_NO_DATA == ret) {
-          //we have captured all of the data
-          //double check that we have some data else return null
-          if (str.IsEmpty()){
-            return scope.Close(Null());
-          }
-
-          break;
-        }
-        else if (SQL_SUCCEEDED(ret)) {
-          //we have not captured all of the data yet
-          
-          if (count == 0) {
-            //no concatenation required, this is our first pass
+    // TODO when UNICODE is not defined, assumes that the character encoding of the data received is UTF-8
+    case SQL_C_TCHAR: default:
 #ifdef UNICODE
-            str = String::New((uint16_t*) buffer);
+      // slowBuffer may or may not exist, depending on whether or not the data had to be split
+      if (resultBuffer)
+        assert (resultBufferOffset % 2 == 0);
+      if (resultBuffer)
+        return scope.Close(String::New(reinterpret_cast<uint16_t*>(resultBuffer), resultBufferOffset / 2));
+      else
+        return scope.Close(String::New(reinterpret_cast<uint16_t*>(internalBuffer), bytesRead / 2));
 #else
-            str = String::New((char *) buffer);
+      if (resultBuffer)
+        return scope.Close(String::New(reinterpret_cast<char*>(resultBuffer), resultBufferOffset));
+      else
+        return scope.Close(String::New(reinterpret_cast<char*>(internalBuffer), bytesRead));
 #endif
-          }
-          else {
-            //we need to concatenate
-#ifdef UNICODE
-            str = String::Concat(str, String::New((uint16_t*) buffer));
-#else
-            str = String::Concat(str, String::New((char *) buffer));
-#endif
-          }
-          
-          //if len is zero let's break out of the loop now and not attempt to
-          //call SQLGetData again. The specific reason for this is because
-          //some ODBC drivers may not correctly report SQL_NO_DATA the next
-          //time around causing an infinite loop here
-          if (len == 0) {
-            break;
-          }
-          
-          count += 1;
-        }
-        else {
-          //an error has occured
-          //possible values for ret are SQL_ERROR (-1) and SQL_INVALID_HANDLE (-2)
-
-          //If we have an invalid handle, then stuff is way bad and we should abort
-          //immediately. Memory errors are bound to follow as we must be in an
-          //inconsisant state.
-          assert(ret != SQL_INVALID_HANDLE);
-
-          //Not sure if throwing here will work out well for us but we can try
-          //since we should have a valid handle and the error is something we 
-          //can look into
-          return ThrowException(ODBC::GetSQLError(
-             SQL_HANDLE_STMT,
-             hStmt,
-             (char *) "[node-odbc] Error in ODBC::GetColumnValue"
-           ));
-          
-          break;
-        }
-      } while (true);
-      
-      return scope.Close(str);
-      //return str;
   }
 }
 
@@ -615,19 +671,20 @@ Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
  */
 
 Local<Object> ODBC::GetRecordTuple ( SQLHSTMT hStmt, Column* columns, 
-                                         short* colCount, uint16_t* buffer,
-                                         int bufferLength) {
+                                     short* colCount, uint16_t* buffer,
+                                     int bufferLength) {
   HandleScope scope;
   
   Local<Object> tuple = Object::New();
         
   for(int i = 0; i < *colCount; i++) {
+    Handle<Value> value = GetColumnValue( hStmt, columns[i], buffer, bufferLength );
+    if (value->IsUndefined())
+      return scope.Close(Local<Object>());
 #ifdef UNICODE
-    tuple->Set( String::New((uint16_t *) columns[i].name),
-                GetColumnValue( hStmt, columns[i], buffer, bufferLength));
+    tuple->Set( String::New((uint16_t *) columns[i].name), value );
 #else
-    tuple->Set( String::New((const char *) columns[i].name),
-                GetColumnValue( hStmt, columns[i], buffer, bufferLength));
+    tuple->Set( String::New((const char *) columns[i].name), value );
 #endif
   }
   
@@ -647,8 +704,10 @@ Handle<Value> ODBC::GetRecordArray ( SQLHSTMT hStmt, Column* columns,
   Local<Array> array = Array::New();
         
   for(int i = 0; i < *colCount; i++) {
-    array->Set( Integer::New(i),
-                GetColumnValue( hStmt, columns[i], buffer, bufferLength));
+    Handle<Value> value = GetColumnValue( hStmt, columns[i], buffer, bufferLength );
+    if (value->IsUndefined())
+      return scope.Close(Handle<Value>());
+    array->Set( Integer::New(i), value );
   }
   
   //return array;
@@ -703,8 +762,8 @@ Parameter* ODBC::GetParametersFromArray (Local<Array> values, int *paramCount) {
 #endif
 
       DEBUG_PRINTF("ODBC::GetParametersFromArray - IsString(): params[%i] "
-                   "c_type=%i type=%i buffer_length=%i size=%i length=%i "
-                   "value=%s\n", i, params[i].c_type, params[i].type,
+                   L"c_type=%i type=%i buffer_length=%i size=%i length=%i "
+                   L"value=%s\n", i, params[i].c_type, params[i].type,
                    params[i].buffer_length, params[i].size, params[i].length, 
                    (char*) params[i].buffer);
     }
@@ -714,7 +773,7 @@ Parameter* ODBC::GetParametersFromArray (Local<Array> values, int *paramCount) {
       params[i].length = SQL_NULL_DATA;
 
       DEBUG_PRINTF("ODBC::GetParametersFromArray - IsNull(): params[%i] "
-                   "c_type=%i type=%i buffer_length=%i size=%i length=%i\n",
+                   L"c_type=%i type=%i buffer_length=%i size=%i length=%i\n",
                    i, params[i].c_type, params[i].type,
                    params[i].buffer_length, params[i].size, params[i].length);
     }
@@ -726,8 +785,8 @@ Parameter* ODBC::GetParametersFromArray (Local<Array> values, int *paramCount) {
       params[i].length = 0;
       
       DEBUG_PRINTF("ODBC::GetParametersFromArray - IsInt32(): params[%i] "
-                   "c_type=%i type=%i buffer_length=%i size=%i length=%i "
-                   "value=%lld\n", i, params[i].c_type, params[i].type,
+                   L"c_type=%i type=%i buffer_length=%i size=%i length=%i "
+                   L"value=%lld\n", i, params[i].c_type, params[i].type,
                    params[i].buffer_length, params[i].size, params[i].length,
                    *number);
     }
@@ -743,8 +802,8 @@ Parameter* ODBC::GetParametersFromArray (Local<Array> values, int *paramCount) {
       params[i].size          = sizeof(double);
 
       DEBUG_PRINTF("ODBC::GetParametersFromArray - IsNumber(): params[%i] "
-                  "c_type=%i type=%i buffer_length=%i size=%i length=%i "
-		  "value=%f\n",
+                  L"c_type=%i type=%i buffer_length=%i size=%i length=%i "
+		          L"value=%f\n",
                   i, params[i].c_type, params[i].type,
                   params[i].buffer_length, params[i].size, params[i].length,
 		  *number);
@@ -757,7 +816,7 @@ Parameter* ODBC::GetParametersFromArray (Local<Array> values, int *paramCount) {
       params[i].length = 0;
       
       DEBUG_PRINTF("ODBC::GetParametersFromArray - IsBoolean(): params[%i] "
-                   "c_type=%i type=%i buffer_length=%i size=%i length=%i\n",
+                   L"c_type=%i type=%i buffer_length=%i size=%i length=%i\n",
                    i, params[i].c_type, params[i].type,
                    params[i].buffer_length, params[i].size, params[i].length);
     }
@@ -822,7 +881,7 @@ Local<Object> ODBC::GetSQLError (SQLSMALLINT handleType, SQLHANDLE handle, char*
   Local<Object> objError = Object::New();
   Local<String> str = String::New("");
 
-  SQLINTEGER i = 0;
+  SQLSMALLINT i = 0;
   SQLINTEGER native;
   
   SQLSMALLINT len;

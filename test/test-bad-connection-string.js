@@ -13,11 +13,8 @@ assert.equal(db.connected, false);
 db.open("this is wrong", function(err) {
   console.log(err);
   
-  assert.deepEqual(err, {
-    error: '[node-odbc] SQL_ERROR',
-    message: '[unixODBC][Driver Manager]Data source name not found, and no default driver specified',
-    state: 'IM002'
-  });
+  // unixODBC may return IM002, but ODBC on Windows gives you 01S00 (invalid connection string attribute)
+  assert(err.state == 'IM002' || err.state == '01S00');
   
   assert.equal(db.connected, false);
 });

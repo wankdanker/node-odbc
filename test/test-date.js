@@ -25,7 +25,11 @@ db.open(common.connectionString, function(err) {
       //test selected data after the connection
       //is closed, in case the assertion fails
       assert.equal(data[0].DT1.constructor.name, "Date", "DT1 is not an instance of a Date object");
-      assert.equal(data[0].DT1.getTime(), dt.getTime());
+
+      // Not all databases have sufficient precision in their datetime type to go down to a millisecond,
+      // e.g. MSSQL. (MSSQL provides datetime2 for better accuracy.)
+      var delta = Math.abs(data[0].DT1.getTime() - dt.getTime());
+      assert(delta < 10, "Times differ by more than 10 milliseconds");
     });
   });
 });

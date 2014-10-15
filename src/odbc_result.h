@@ -48,6 +48,10 @@ class ODBCResult : public node::ObjectWrap {
     static Handle<Value> FetchAll(const Arguments& args);
     static void UV_FetchAll(uv_work_t* work_req);
     static void UV_AfterFetchAll(uv_work_t* work_req, int status);
+
+    static Handle<Value> GetColumnValue(const Arguments& args);
+    static void UV_GetColumnValue(uv_work_t* work_req);
+    static void UV_AfterGetColumnValue(uv_work_t* work_req, int status);
     
     //sync methods
     static Handle<Value> CloseSync(const Arguments& args);
@@ -55,6 +59,7 @@ class ODBCResult : public node::ObjectWrap {
     static Handle<Value> FetchSync(const Arguments& args);
     static Handle<Value> FetchAllSync(const Arguments& args);
     static Handle<Value> GetColumnNamesSync(const Arguments& args);
+    static Handle<Value> GetColumnValueSync(const Arguments& args);
     
     //property getter/setters
     static Handle<Value> FetchModeGetter(Local<String> property, const AccessorInfo &info);
@@ -70,6 +75,26 @@ class ODBCResult : public node::ObjectWrap {
       int errorCount;
       Persistent<Array> rows;
       Persistent<Object> objError;
+    };
+
+    struct get_column_value_work_data {
+      Persistent<Function> cb;
+      ODBCResult *objResult;
+      SQLRETURN result;
+
+      SQLUSMALLINT col;
+      SQLLEN bytesRequested;
+      SQLSMALLINT cType;
+
+      // State 
+      Persistent<Object> resultBuffer; // Used for keeping the buffer alive
+      void* resultBufferContents;
+      size_t resultBufferOffset;
+      SQLLEN resultBufferLength;
+
+      SQLLEN bytesAvailable;
+      SQLLEN bytesRead;
+
     };
     
     ODBCResult *self(void) { return this; }

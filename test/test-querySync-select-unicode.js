@@ -8,7 +8,7 @@ db.openSync(common.connectionString);
 var data;
 
 try {
-  data = db.querySync("select 'ꜨꜢ' as UNICODETEXT");
+  data = db.querySync("select ? as UNICODETEXT", ['ꜨꜢ']);
 }
 catch (e) {
   console.log(e); 
