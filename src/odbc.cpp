@@ -816,7 +816,6 @@ Local<Object> ODBC::GetSQLError (SQLSMALLINT handleType, SQLHANDLE handle, char*
   DEBUG_PRINTF("ODBC::GetSQLError : handleType=%i, handle=%p\n", handleType, handle);
   
   Local<Object> objError = NanNew<Object>();
-  Local<String> str = NanNew<String>("");
 
   SQLINTEGER i = 0;
   SQLINTEGER native;
@@ -839,6 +838,9 @@ Local<Object> ODBC::GetSQLError (SQLSMALLINT handleType, SQLHANDLE handle, char*
   // Windows seems to define SQLINTEGER as long int, unixodbc as just int... %i should cover both
   DEBUG_PRINTF("ODBC::GetSQLError : called SQLGetDiagField; ret=%i, statusRecCount=%i\n", ret, statusRecCount);
 
+  Local<Array> errors = NanNew<Array>();
+  objError->Set(NanNew("errors"), errors);
+  
   for (i = 0; i < statusRecCount; i++){
     DEBUG_PRINTF("ODBC::GetSQLError : calling SQLGetDiagRec; i=%i, statusRecCount=%i\n", i, statusRecCount);
     
@@ -856,22 +858,32 @@ Local<Object> ODBC::GetSQLError (SQLSMALLINT handleType, SQLHANDLE handle, char*
 
     if (SQL_SUCCEEDED(ret)) {
       DEBUG_PRINTF("ODBC::GetSQLError : errorMessage=%s, errorSQLState=%s\n", errorMessage, errorSQLState);
-
-      objError->Set(NanNew("error"), NanNew(message));
+      
+      if (i == 0) {
+        // First error is assumed the primary error
+        objError->Set(NanNew("error"), NanNew(message));
 #ifdef UNICODE
-      str = String::Concat(str, NanNew((uint16_t *) errorMessage));
-
-      //TODO: Should this also be str?
-      objError->SetPrototype(Exception::Error(NanNew((uint16_t *) errorMessage)));
-      objError->Set(NanNew("message"), str);
-      objError->Set(NanNew("state"), NanNew((uint16_t *) errorSQLState));
+        objError->SetPrototype(Exception::Error(NanNew((uint16_t *)errorMessage)));
+        objError->Set(NanNew("message"), NanNew((uint16_t *)errorMessage));
+        objError->Set(NanNew("state"), NanNew((uint16_t *)errorSQLState));
 #else
-      str = String::Concat(str, NanNew(errorMessage));
-
-      objError->SetPrototype(Exception::Error(NanNew(errorMessage)));
-      objError->Set(NanNew("message"), str);
-      objError->Set(NanNew("state"), NanNew(errorSQLState));
+        objError->SetPrototype(Exception::Error(NanNew(errorMessage)));
+        objError->Set(NanNew("message"), NanNew(errorMessage));
+        objError->Set(NanNew("state"), NanNew(errorSQLState));
 #endif
+      }
+
+      Local<Object> subError = NanNew<Object>();
+
+#ifdef UNICODE
+      subError->Set(NanNew("message"), NanNew((uint16_t *)errorMessage));
+      subError->Set(NanNew("state"), NanNew((uint16_t *)errorSQLState));
+#else
+      subError->Set(NanNew("message"), NanNew(errorMessage));
+      subError->Set(NanNew("state"), NanNew(errorSQLState));
+#endif
+      errors->Set(NanNew(i), subError);
+
     } else if (ret == SQL_NO_DATA) {
       break;
     }
