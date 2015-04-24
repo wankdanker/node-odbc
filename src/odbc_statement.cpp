@@ -216,9 +216,7 @@ void ODBCStatement::UV_AfterExecute(uv_work_t* req, int status) {
     args[2] = NanNew<External>(self->m_hSTMT);
     args[3] = NanNew<External>(canFreeHandle);
     
-    // TODO is this object being cleared anywhere? Memory leak?
-    Persistent<Object> js_result;
-    NanAssignPersistent(js_result, NanNew(ODBCResult::constructor)->NewInstance(4, args));
+    Local<Object> js_result = NanNew(ODBCResult::constructor)->NewInstance(4, args);
 
     args[0] = NanNew<Value>(NanNull());
     args[1] = NanNew(js_result);
@@ -356,11 +354,12 @@ void ODBCStatement::UV_AfterExecuteNonQuery(uv_work_t* req, int status) {
     Local<Value> args[2];
 
     args[0] = NanNew<Value>(NanNull());
+    // We get a potential loss of precision here. Number isn't as big as int64. Probably fine though.
     args[1] = NanNew<Value>(NanNew<Number>(rowCount));
 
     TryCatch try_catch;
     
-    data->cb->Call(NanGetCurrentContext()->Global(), 2, args);
+    data->cb->Call(2, args);
 
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
@@ -501,9 +500,7 @@ void ODBCStatement::UV_AfterExecuteDirect(uv_work_t* req, int status) {
     args[2] = NanNew<External>(self->m_hSTMT);
     args[3] = NanNew<External>(canFreeHandle);
     
-    //TODO persistent leak?
-    Persistent<Object> js_result;
-    NanAssignPersistent(js_result, NanNew<Function>(ODBCResult::constructor)->NewInstance(4, args));
+    Local<Object> js_result =  NanNew<Function>(ODBCResult::constructor)->NewInstance(4, args);
 
     args[0] = NanNew<Value>(NanNull());
     args[1] = NanNew(js_result);
@@ -566,9 +563,7 @@ NAN_METHOD(ODBCStatement::ExecuteDirectSync) {
     result[2] = NanNew<External>(stmt->m_hSTMT);
     result[3] = NanNew<External>(canFreeHandle);
     
-    //TODO persistent leak?
-    Persistent<Object> js_result;
-    NanAssignPersistent(js_result, NanNew<Function>(ODBCResult::constructor)->NewInstance(4, result));
+    Local<Object> js_result = NanNew<Function>(ODBCResult::constructor)->NewInstance(4, result);
     
     NanReturnValue(js_result);
   }

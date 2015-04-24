@@ -502,7 +502,6 @@ void ODBCResult::UV_AfterFetchAll(uv_work_t* work_req, int status) {
     doMoreWork = false;
   }
   else {
-    //TODO: !important: persistent forces us to set this to a local handle, but do we need to recopy it back to persistent handle?
     Local<Array> rows = NanNew(data->rows);
     if (data->fetchMode == FETCH_ARRAY) {
       rows->Set(
@@ -562,7 +561,6 @@ void ODBCResult::UV_AfterFetchAll(uv_work_t* work_req, int status) {
       FatalException(try_catch);
     }
 
-    //TODO: Do we need to free self->rows somehow?
     free(data);
     free(work_req);
 
