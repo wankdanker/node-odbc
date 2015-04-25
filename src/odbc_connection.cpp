@@ -771,8 +771,8 @@ NAN_METHOD(ODBCConnection::Query) {
       }
       
       Local<String> optionNoResultsKey = NanNew(OPTION_NORESULTS);
-      if (obj->Has(optionParamsKey) && obj->Get(optionParamsKey)->IsBoolean()) {
-        data->noResultObject = obj->Get(optionParamsKey)->ToBoolean()->Value();
+      if (obj->Has(optionNoResultsKey) && obj->Get(optionNoResultsKey)->IsBoolean()) {
+        data->noResultObject = obj->Get(optionNoResultsKey)->ToBoolean()->Value();
       }
       else {
         data->noResultObject = false;
@@ -1032,7 +1032,7 @@ NAN_METHOD(ODBCConnection::QuerySync) {
 #ifdef UNICODE
         sql = new String::Value(obj->Get(optionSqlKey)->ToString());
 #else
-        sql = new String::Utf8Value(obj->Get(OPTION_SQL)->ToString());
+        sql = new String::Utf8Value(obj->Get(optionSqlKey)->ToString());
 #endif
       }
       else {
