@@ -974,14 +974,14 @@ NAN_METHOD(ODBC::LoadODBCLibrary) {
   
   bool result = DynLoadODBC(*js_library);
   
-  NanReturnValue((result) ? True() : False());
+  NanReturnValue((result) ? NanTrue() : NanFalse());
 }
 #endif
 
 extern "C" void init(v8::Handle<Object> exports) {
 #ifdef dynodbc
   exports->Set(NanNew("loadODBCLibrary"),
-        FunctionTemplate::New(ODBC::LoadODBCLibrary)->GetFunction());
+        NanNew<FunctionTemplate>(ODBC::LoadODBCLibrary)->GetFunction());
 #endif
   
   ODBC::Init(exports);

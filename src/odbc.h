@@ -89,7 +89,7 @@ class ODBC : public node::ObjectWrap {
     static Local<Object> GetSQLError (SQLSMALLINT handleType, SQLHANDLE handle, char* message);
     static Local<Array>  GetAllRecordsSync (HENV hENV, HDBC hDBC, HSTMT hSTMT, uint16_t* buffer, int bufferLength);
 #ifdef dynodbc
-    static Handle<Value> LoadODBCLibrary(const Arguments& args);
+    static NAN_METHOD(LoadODBCLibrary);
 #endif
     static Parameter* GetParametersFromArray (Local<Array> values, int* paramCount);
     
