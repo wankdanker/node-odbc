@@ -4,6 +4,8 @@ var odbc = require("../");
 //odbc.library = '/opt/sqlncli-11.0.1790.0/lib64/libsqlncli-11.0';
 
 exports.connectionString = "DRIVER={SQLite3};DATABASE=data/sqlite-test.db";
+exports.title = "Sqlite3";
+exports.dialect = "sqlite";
 
 if (process.argv.length === 3) {
   exports.connectionString = process.argv[2];
@@ -18,14 +20,14 @@ try {
   exports.testConnectionStrings = require('./config.testConnectionStrings.json');
 }
 catch (e) {
-  exports.testConnectionStrings = [{ title : "Sqlite3", connectionString : exports.connectionString }];
+  exports.testConnectionStrings = [{ title : exports.title, connectionString : exports.connectionString, dialect : exports.dialect }];
 }
 
 try {
   exports.benchConnectionStrings = require('./config.benchConnectionStrings.json');
 }
 catch (e) {
-  exports.benchConnectionStrings = [{ title : "Sqlite3", connectionString : exports.connectionString }];
+  exports.benchConnectionStrings = [{ title : exports.title, connectionString : exports.connectionString, dialect : exports.dialect }];
 }
 
 if (process.argv.length === 3) {
@@ -34,8 +36,9 @@ if (process.argv.length === 3) {
   var lookup = process.argv[2];
   
   exports.testConnectionStrings.forEach(function (connectionString) {
-    if (connectionString && connectionString.title && connectionString.title == lookup) {
-      exports.connectionString = connectionString.connectionString
+    if (connectionString && (connectionString.title == lookup || connectionString.connectionString == lookup)) {
+      exports.connectionString = connectionString.connectionString;
+      exports.dialect = connectionString.dialect;
     }
   });
 }

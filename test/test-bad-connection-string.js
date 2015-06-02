@@ -17,6 +17,10 @@ db.open("this is wrong", function(err) {
     error: '[node-odbc] SQL_ERROR',
     message: '[unixODBC][Driver Manager]Data source name not found, and no default driver specified',
     state: 'IM002'
+    , errors : [{
+      message: '[unixODBC][Driver Manager]Data source name not found, and no default driver specified',
+      state: 'IM002'     
+    }]
   });
   
   assert.equal(db.connected, false);

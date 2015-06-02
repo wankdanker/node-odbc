@@ -1,6 +1,6 @@
 [
-	{ "title" : "Sqlite3", "connectionString" : "DRIVER={SQLite3};DATABASE=data/sqlite-test.db" }
-	, { "title" : "MySQL-Local", "connectionString" : "DRIVER={MySQL};DATABASE=test;HOST=localhost;SOCKET=/var/run/mysqld/mysqld.sock;USER=test;" }
-	, { "title" : "MSSQL-FreeTDS-Remote", "connectionString" : "DRIVER={FreeTDS};SERVERNAME=sql2;DATABASE=test;UID=test;PWD=test;AutoTranslate=yes;TEXTSIZE=10000000" }
-	, { "title" : "MSSQL-NativeCLI-Remote", "connectionString" : "DRIVER={SQL Server Native Client 11.0};SERVER=sql2;DATABASE=test;UID=test;PWD=test;" }
+	{ "title" : "Sqlite3", "connectionString" : "DRIVER={SQLite3};DATABASE=data/sqlite-test.db", "dialect" : "sqlite" }
+	, { "title" : "MySQL-Local", "connectionString" : "DRIVER={MySQL};DATABASE=test;HOST=localhost;SOCKET=/var/run/mysqld/mysqld.sock;USER=test;", "dialect" : "mysql" }
+	, { "title" : "MSSQL-FreeTDS-Remote", "connectionString" : "DRIVER={FreeTDS};SERVERNAME=sql2;DATABASE=test;UID=test;PWD=test;AutoTranslate=yes;TEXTSIZE=10000000", "dialect" : "mssql" }
+	, { "title" : "MSSQL-NativeCLI-Remote", "connectionString" : "DRIVER={SQL Server Native Client 11.0};SERVER=sql2;DATABASE=test;UID=test;PWD=test;", "dialect": "mssql" }
 ]

@@ -365,7 +365,7 @@ Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
     case SQL_INTEGER : 
     case SQL_SMALLINT :
     case SQL_TINYINT : {
-        long value = 0;
+        int32_t value = 0;
         
         ret = SQLGetData(
           hStmt, 
@@ -375,14 +375,14 @@ Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
           sizeof(value), 
           &len);
         
-        DEBUG_PRINTF("ODBC::GetColumnValue - Integer: index=%i name=%s type=%i len=%i ret=%i\n", 
-                    column.index, column.name, column.type, len, ret);
+        DEBUG_PRINTF("ODBC::GetColumnValue - Integer: index=%i name=%s type=%i len=%i ret=%i val=%li\n", 
+                    column.index, column.name, column.type, len, ret, value);
         
         if (len == SQL_NULL_DATA) {
           return NanEscapeScope(NanNull());
         }
         else {
-          return NanEscapeScope(NanNew<Number>(value));
+          return NanEscapeScope(NanNew<Integer>(value));
         }
       }
       break;
@@ -974,14 +974,14 @@ NAN_METHOD(ODBC::LoadODBCLibrary) {
   
   bool result = DynLoadODBC(*js_library);
   
-  NanReturnValue((result) ? True() : False());
+  NanReturnValue((result) ? NanTrue() : NanFalse());
 }
 #endif
 
 extern "C" void init(v8::Handle<Object> exports) {
 #ifdef dynodbc
   exports->Set(NanNew("loadODBCLibrary"),
-        FunctionTemplate::New(ODBC::LoadODBCLibrary)->GetFunction());
+        NanNew<FunctionTemplate>(ODBC::LoadODBCLibrary)->GetFunction());
 #endif
   
   ODBC::Init(exports);

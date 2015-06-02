@@ -43,7 +43,11 @@ function doTest(file, connectionString) {
   process.stdout.write(" ... ");
 
   testCount += 1;
-  
+
+  //TODO: process the following if some flag is set
+  //test.stdout.pipe(process.stdout);
+  //test.stderr.pipe(process.stderr);
+
   test.on("exit", function (code, signal) {
     clearTimeout(timer);
     
