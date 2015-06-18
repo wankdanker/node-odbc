@@ -33,7 +33,9 @@
   },
   "dependencies": {
     "bindings": "~1.0.0",
-    "nan": "^1.8.4",
+    "nan": "^1.8.4"
+  }
+  "devDependencies": {
     "pangyp": "^2.2.0"
   },
   "gypfile": true
