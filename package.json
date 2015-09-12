@@ -32,7 +32,7 @@
     "test": "cd test && node run-tests.js"
   },
   "dependencies": {
-    "bindings": "~1.0.0",
+    "bindings": "*",
     "nan": "*"
   },
   "gypfile": true
