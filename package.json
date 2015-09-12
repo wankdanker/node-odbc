@@ -28,13 +28,12 @@
     "node": ">=0.8.0"
   },
   "scripts": {
-    "install": "pangyp configure build",
+    "install": "node-gyp configure build",
     "test": "cd test && node run-tests.js"
   },
   "dependencies": {
     "bindings": "~1.0.0",
-    "nan": "*1.8.4",
-    "pangyp": "^2.2.0"
+    "nan": "*1.8.4"
   },
   "gypfile": true
 }
