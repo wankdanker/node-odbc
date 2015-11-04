@@ -691,10 +691,16 @@ Parameter* ODBC::GetParametersFromArray (Local<Array> values, int *paramCount) {
       params[i].ValueType         = SQL_C_TCHAR;
       params[i].ColumnSize        = 0; //SQL_SS_LENGTH_UNLIMITED 
 #ifdef UNICODE
-      params[i].ParameterType     = SQL_WVARCHAR;
+	  if (length > 4000)
+		  params[i].ParameterType     = SQL_WLONGVARCHAR;
+	  else
+		  params[i].ParameterType     = SQL_WVARCHAR;
       params[i].BufferLength      = (length * sizeof(uint16_t)) + sizeof(uint16_t);
 #else
-      params[i].ParameterType     = SQL_VARCHAR;
+	  if (length > 4000)
+		  params[i].ParameterType     = SQL_WLONGVARCHAR;
+	  else
+		  params[i].ParameterType     = SQL_VARCHAR;
       params[i].BufferLength      = string->Utf8Length() + 1;
 #endif
       params[i].ParameterValuePtr = malloc(params[i].BufferLength);
