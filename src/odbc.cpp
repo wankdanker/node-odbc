@@ -438,43 +438,14 @@ Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
         //return Null();
       }
       else {
-		  
-		  char dateStr[64] = "new Date('";
-		  char *endStr = "')";
-		  strcat(dateStr, (char *)buffer);
-		  strcat(dateStr, endStr);
-		  Handle<String> source = String::NewFromUtf8(Isolate::GetCurrent(), dateStr);
-		  Handle<Script> script = Script::Compile(source);
-		  Handle<Value> result = script->Run();	
-          return scope.Escape(result);
-
-		/*
-        if (strptime((char *) buffer, "%Y-%m-%d %H:%M:%S", &timeInfo)) {
-          //a negative value means that mktime() should use timezone information
-          //and system databases to attempt to determine whether DST is in effect
-          //at the specified time.
-		  
-		  SYSTEMTIME systemTime = {
-			timeInfo.tm_year, timeInfo.tm_mon, 0, timeInfo.tm_mday,
-			timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec,
-			0 // wMilliseconds
-		  };
-		  
-		  FILETIME fileTime;
-		  if(!SystemTimeToFileTime(&systemTime, &fileTime))
-			  return 0;
-		  
-		  LARGE_INTEGER ll;
-		  ll.LowPart = fileTime.dwLowDateTime;
-		  ll.HighPart = fileTime.dwHighDateTime;		  
-          
-          //return scope.Escape(Date::New(Isolate::GetCurrent(), (double(mktime(&timeInfo)) * 1000));
-          return scope.Escape(Nan::New<Date>(double(ll.QuadPart - 116444736000000000I64) / 10000).ToLocalChecked());
-        }
-        else {
-          return scope.Escape(Nan::New((char *)buffer).ToLocalChecked());
-        }
-		*/
+        char dateStr[64] = "new Date('";
+        char *endStr = "')";
+        strcat(dateStr, (char *)buffer);
+		    strcat(dateStr, endStr);
+		    Handle<String> source = String::NewFromUtf8(Isolate::GetCurrent(), dateStr);
+		    Handle<Script> script = Script::Compile(source);
+		    Handle<Value> result = script->Run();	
+        return scope.Escape(result);
       }
 #else
       struct tm timeInfo = { 
