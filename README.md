@@ -11,6 +11,7 @@ requirements
   * on Ubuntu/Debian `sudo apt-get install unixodbc unixodbc-dev`
   * on RedHat/CentOS `sudo yum install unixODBC unixODBC-devel`
   * on OSX using macports.org `sudo port unixODBC`
+  * on OSX using brew `brew install unixODBC`
 * odbc drivers for target database
 * properly configured odbc.ini and odbcinst.ini.
 
