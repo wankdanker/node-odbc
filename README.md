@@ -13,6 +13,7 @@ requirements
   * on OSX
     * using macports.org `sudo port unixODBC`
     * using brew `brew install unixODBC`
+  * on IBM i `yum install unixODBC unixODBC-devel` (requires [yum](http://ibm.biz/ibmi-rpms))
 * odbc drivers for target database
 * properly configured odbc.ini and odbcinst.ini.
 
