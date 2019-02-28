@@ -574,6 +574,14 @@ Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
             break;
           }
           
+          //hack: if we have a success with info and the buffer wasn't filled
+          //then there is probably an issue with the driver not correctly reporting
+          //SQL_NO_DATA the next time around. This has been seen with MSSQL
+          //sql_variant fields on FreeTDS.
+          if (SQL_SUCCESS_WITH_INFO == ret && len < bufferLength) {
+            break;
+          }
+
           count += 1;
         }
         else {
