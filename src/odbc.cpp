@@ -422,18 +422,14 @@ Handle<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
         //return Null();
       }
       else {
-        if (strptime((char *) buffer, "%Y-%m-%d %H:%M:%S", &timeInfo)) {
-          //a negative value means that mktime() should use timezone information
-          //and system databases to attempt to determine whether DST is in effect
-          //at the specified time.
-          timeInfo.tm_isdst = -1;
-          
-          //return scope.Escape(Date::New(Isolate::GetCurrent(), (double(mktime(&timeInfo)) * 1000));
-          return scope.Escape(Nan::New<Date>(double(mktime(&timeInfo)) * 1000).ToLocalChecked());
-        }
-        else {
-          return scope.Escape(Nan::New((char *)buffer).ToLocalChecked());
-        }
+        char dateStr[64] = "new Date('";
+        char *endStr = "')";
+        strcat(dateStr, (char *)buffer);
+		    strcat(dateStr, endStr);
+		    Handle<String> source = String::NewFromUtf8(Isolate::GetCurrent(), dateStr);
+		    Handle<Script> script = Script::Compile(source);
+		    Handle<Value> result = script->Run();	
+        return scope.Escape(result);
       }
 #else
       struct tm timeInfo = { 
