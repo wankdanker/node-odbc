@@ -2,13 +2,13 @@
 
 require('dotenv').config();
 const assert = require('assert');
-const { Connection } = require('../../');
+const odbc = require('../../');
 
 describe('.beginTransaction([callback])...', () => {
   let connection = null;
 
-  beforeEach(() => {
-    connection = new Connection(`${process.env.CONNECTION_STRING}`);
+  beforeEach(async () => {
+    connection = await odbc.connect(`${process.env.CONNECTION_STRING}`);
   });
 
   afterEach(async () => {
@@ -104,38 +104,44 @@ describe('.beginTransaction([callback])...', () => {
       });
     });
     it('...should make transactional queries visible only to the connection that the transaction was started on until commit() is called (at transactional isolation level \'read committed\').', (done) => {
-      const connection1 = new Connection(`${process.env.CONNECTION_STRING};CMT=1`); // set commitment level to 1 (Read committed)
-      const connection2 = new Connection(`${process.env.CONNECTION_STRING};CMT=1;CONCURRENTACCESSRESOLUTION=1`); // set commitment level to 1 (Read committed)
-      connection1.beginTransaction((error0) => {
-        assert.deepEqual(error0, null);
-        connection1.query(`INSERT INTO ${process.env.DB_SCHEMA}.${process.env.DB_TABLE} VALUES(1, 'committed', 10)`, (error2, result2) => {
+      // set commitment level to 1 (Read committed)
+      odbc.connect(`${process.env.CONNECTION_STRING};CMT=1`, (error1, connection1) => {
+        assert.deepEqual(error1, null);
+        // set commitment level to 1 (Read committed)
+        odbc.connect(`${process.env.CONNECTION_STRING};CMT=1;CONCURRENTACCESSRESOLUTION=1`, (error2, connection2) => {
           assert.deepEqual(error2, null);
-          assert.notDeepEqual(result2, null);
-          assert.deepEqual(result2.count, 1);
-          connection1.query(`SELECT * FROM ${process.env.DB_SCHEMA}.${process.env.DB_TABLE} FETCH1`, (error3, result3) => {
+          connection1.beginTransaction((error3) => {
             assert.deepEqual(error3, null);
-            assert.notDeepEqual(result3, null);
-            assert.deepEqual(result3.length, 1);
-            assert.deepEqual(result3[0], { ID: 1, NAME: 'committed', AGE: 10 });
-            assert.deepEqual(result3.count, -1);
-            connection2.query(`SELECT * FROM ${process.env.DB_SCHEMA}.${process.env.DB_TABLE} FETCH2`, (error4, result4) => {
+            connection1.query(`INSERT INTO ${process.env.DB_SCHEMA}.${process.env.DB_TABLE} VALUES(1, 'committed', 10)`, (error4, result4) => {
               assert.deepEqual(error4, null);
               assert.notDeepEqual(result4, null);
-              assert.deepEqual(result4.length, 0);
-              assert.deepEqual(result4.count, -1);
-              connection1.commit((error5) => {
+              assert.deepEqual(result4.count, 1);
+              connection1.query(`SELECT * FROM ${process.env.DB_SCHEMA}.${process.env.DB_TABLE} FETCH1`, (error5, result5) => {
                 assert.deepEqual(error5, null);
-                connection2.query(`SELECT * FROM ${process.env.DB_SCHEMA}.${process.env.DB_TABLE}`, (error6, result6) => {
+                assert.notDeepEqual(result5, null);
+                assert.deepEqual(result5.length, 1);
+                assert.deepEqual(result5[0], { ID: 1, NAME: 'committed', AGE: 10 });
+                assert.deepEqual(result5.count, -1);
+                connection2.query(`SELECT * FROM ${process.env.DB_SCHEMA}.${process.env.DB_TABLE} FETCH2`, (error6, result6) => {
                   assert.deepEqual(error6, null);
                   assert.notDeepEqual(result6, null);
-                  assert.deepEqual(result6.length, 1);
+                  assert.deepEqual(result6.length, 0);
                   assert.deepEqual(result6.count, -1);
-                  assert.deepEqual(result6[0], { ID: 1, NAME: 'committed', AGE: 10 });
-                  connection1.close((error7) => {
+                  connection1.commit((error7) => {
                     assert.deepEqual(error7, null);
-                    connection2.close((error8) => {
+                    connection2.query(`SELECT * FROM ${process.env.DB_SCHEMA}.${process.env.DB_TABLE}`, (error8, result8) => {
                       assert.deepEqual(error8, null);
-                      done();
+                      assert.notDeepEqual(result8, null);
+                      assert.deepEqual(result8.length, 1);
+                      assert.deepEqual(result8.count, -1);
+                      assert.deepEqual(result8[0], { ID: 1, NAME: 'committed', AGE: 10 });
+                      connection1.close((error9) => {
+                        assert.deepEqual(error9, null);
+                        connection2.close((error10) => {
+                          assert.deepEqual(error10, null);
+                          done();
+                        });
+                      });
                     });
                   });
                 });
@@ -146,25 +152,29 @@ describe('.beginTransaction([callback])...', () => {
       });
     });
     it('...shouldn\'t hide queries that occur on other connections.', (done) => {
-      const connection1 = new Connection(`${process.env.CONNECTION_STRING}`);
-      const connection2 = new Connection(`${process.env.CONNECTION_STRING}`);
-      connection1.beginTransaction((error1) => {
+      odbc.connect(`${process.env.CONNECTION_STRING}`, (error1, connection1) => {
         assert.deepEqual(error1, null);
-        connection2.query(`INSERT INTO ${process.env.DB_SCHEMA}.${process.env.DB_TABLE} VALUES(1, 'committed', 10)`, (error2, result2) => {
+        odbc.connect(`${process.env.CONNECTION_STRING}`, (error2, connection2) => {
           assert.deepEqual(error2, null);
-          assert.notDeepEqual(result2, null);
-          assert.deepEqual(result2.count, 1);
-          connection1.query(`SELECT * FROM ${process.env.DB_SCHEMA}.${process.env.DB_TABLE}`, (error3, result3) => {
+          connection1.beginTransaction((error3) => {
             assert.deepEqual(error3, null);
-            assert.notDeepEqual(result3, null);
-            assert.deepEqual(result3.length, 1);
-            assert.deepEqual(result3[0], { ID: 1, NAME: 'committed', AGE: 10 });
-            assert.deepEqual(result3.count, -1);
-            connection1.close((error4) => {
+            connection2.query(`INSERT INTO ${process.env.DB_SCHEMA}.${process.env.DB_TABLE} VALUES(1, 'committed', 10)`, (error4, result4) => {
               assert.deepEqual(error4, null);
-              connection2.close((error5) => {
+              assert.notDeepEqual(result4, null);
+              assert.deepEqual(result4.count, 1);
+              connection1.query(`SELECT * FROM ${process.env.DB_SCHEMA}.${process.env.DB_TABLE}`, (error5, result5) => {
                 assert.deepEqual(error5, null);
-                done();
+                assert.notDeepEqual(result5, null);
+                assert.deepEqual(result5.length, 1);
+                assert.deepEqual(result5[0], { ID: 1, NAME: 'committed', AGE: 10 });
+                assert.deepEqual(result5.count, -1);
+                connection1.close((error6) => {
+                  assert.deepEqual(error6, null);
+                  connection2.close((error7) => {
+                    assert.deepEqual(error7, null);
+                    done();
+                  });
+                });
               });
             });
           });

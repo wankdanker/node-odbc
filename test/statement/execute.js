@@ -2,13 +2,13 @@
 
 require('dotenv').config();
 const assert = require('assert');
-const { Connection } = require('../../');
+const odbc = require('../../');
 
 describe('.execute([calback])...', () => {
   let connection = null;
 
-  beforeEach(() => {
-    connection = new Connection(`${process.env.CONNECTION_STRING}`);
+  beforeEach(async () => {
+    connection = await odbc.connect(`${process.env.CONNECTION_STRING}`);
   });
 
   afterEach(async () => {

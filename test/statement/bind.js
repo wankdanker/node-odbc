@@ -2,13 +2,21 @@
 
 require('dotenv').config();
 const assert = require('assert');
-const { Connection } = require('../../');
-
-const connection = new Connection(`${process.env.CONNECTION_STRING}`);
+const odbc = require('../../');
 
 describe('.bind(parameters, [calback])...', () => {
+  let connection = null;
+
+  beforeEach(async () => {
+    connection = await odbc.connect(`${process.env.CONNECTION_STRING}`);
+  });
+
+  afterEach(async () => {
+    await connection.close();
+    connection = null;
+  });
+
   it('...should throw a TypeError if function signature doesn\'t match accepted signatures.', async () => {
-    // const connection = new Connection(`${process.env.CONNECTION_STRING}`);
     const statement = await connection.createStatement();
 
     const BIND_TYPE_ERROR = {
@@ -59,7 +67,6 @@ describe('.bind(parameters, [calback])...', () => {
   });
   describe('...with callbacks...', () => {
     it('...should bind if a valid SQL string has been prepared.', (done) => {
-      // const connection = new Connection(`${process.env.CONNECTION_STRING}`);
       connection.createStatement((error1, statement) => {
         assert.deepEqual(error1, null);
         assert.notDeepEqual(statement, null);
@@ -73,7 +80,6 @@ describe('.bind(parameters, [calback])...', () => {
       });
     });
     it('...should bind even if an parameter types are invalid for the prepared SQL statement', (done) => {
-      // const connection = new Connection(`${process.env.CONNECTION_STRING}`);
       connection.createStatement((error1, statement) => {
         assert.deepEqual(error1, null);
         assert.notDeepEqual(statement, null);
@@ -87,7 +93,6 @@ describe('.bind(parameters, [calback])...', () => {
       });
     });
     it('...should not bind if an invalid SQL statement has been prepared (> 0 parameters).', (done) => {
-      // const connection = new Connection(`${process.env.CONNECTION_STRING}`);
       connection.createStatement((error1, statement) => {
         assert.deepEqual(error1, null);
         assert.notDeepEqual(statement, null);
@@ -103,7 +108,6 @@ describe('.bind(parameters, [calback])...', () => {
       });
     });
     it('...should not bind if an invalid SQL statement has been prepared (0 parameters).', (done) => {
-      // const connection = new Connection(`${process.env.CONNECTION_STRING}`);
       connection.createStatement((error1, statement) => {
         assert.deepEqual(error1, null);
         assert.notDeepEqual(statement, null);
@@ -119,7 +123,6 @@ describe('.bind(parameters, [calback])...', () => {
       });
     });
     it('...should not bind if there is an incorrect number of parameters for the prepared SQL statement', (done) => {
-      // const connection = new Connection(`${process.env.CONNECTION_STRING}`);
       connection.createStatement((error1, statement) => {
         assert.deepEqual(error1, null);
         assert.notDeepEqual(statement, null);
@@ -134,7 +137,6 @@ describe('.bind(parameters, [calback])...', () => {
       });
     });
     it('...should not bind if statement.prepare({string}, {function}[optional]) has not yet been called (> 0 parameters).', (done) => {
-      // const connection = new Connection(`${process.env.CONNECTION_STRING}`);
       connection.createStatement((error1, statement) => {
         assert.deepEqual(error1, null);
         assert.notDeepEqual(statement, null);
@@ -146,7 +148,6 @@ describe('.bind(parameters, [calback])...', () => {
       });
     });
     it('...should not bind if statement.prepare({string}, {function}[optional]) has not yet been called (0 parameters).', (done) => {
-      // const connection = new Connection(`${process.env.CONNECTION_STRING}`);
       connection.createStatement((error1, statement) => {
         assert.deepEqual(error1, null);
         assert.notDeepEqual(statement, null);
@@ -160,7 +161,7 @@ describe('.bind(parameters, [calback])...', () => {
   }); // '...with callbacks...'
   describe('...with promises...', () => {
     it('...should bind if a valid SQL string has been prepared.', async () => {
-      assert.doesNotReject(async () => {
+      await assert.doesNotReject(async () => {
         const statement = await connection.createStatement();
         assert.notDeepEqual(statement, null);
         await statement.prepare(`INSERT INTO ${process.env.DB_SCHEMA}.${process.env.DB_TABLE} VALUES(?, ?, ?)`);
@@ -168,7 +169,7 @@ describe('.bind(parameters, [calback])...', () => {
       });
     });
     it('...should bind even if an parameter types are invalid for the prepared SQL statement', async () => {
-      assert.doesNotReject(async () => {
+      await assert.doesNotReject(async () => {
         const statement = await connection.createStatement();
         assert.notDeepEqual(statement, null);
         await statement.prepare(`INSERT INTO ${process.env.DB_SCHEMA}.${process.env.DB_TABLE} VALUES(?, ?, ?)`);
@@ -203,21 +204,21 @@ describe('.bind(parameters, [calback])...', () => {
       const statement = await connection.createStatement();
       assert.notDeepEqual(statement, null);
       await statement.prepare(`INSERT INTO ${process.env.DB_SCHEMA}.${process.env.DB_TABLE} VALUES(?, ?, ?)`);
-      assert.rejects(async () => {
+      await assert.rejects(async () => {
         await statement.bind([1, 'bound']);
       });
     });
     it('...should not bind if statement.prepare({string}, {function}[optional]) has not yet been called (> 0 parameters).', async () => {
       const statement = await connection.createStatement();
       assert.notDeepEqual(statement, null);
-      assert.rejects(async () => {
+      await assert.rejects(async () => {
         await statement.bind([1, 'bound', 10]);
       });
     });
     it('...should not bind if statement.prepare({string}, {function}[optional]) has not yet been called (0 parameters).', async () => {
       const statement = await connection.createStatement();
       assert.notDeepEqual(statement, null);
-      assert.rejects(async () => {
+      await assert.rejects(async () => {
         await statement.bind([]);
       });
     });

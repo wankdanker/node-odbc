@@ -1,4 +1,5 @@
 /*
+  Copyright (c) 2019, IBM
   Copyright (c) 2013, Dan VerWeire<dverweire@gmail.com>
 
   Permission to use, copy, modify, and/or distribute this software for any
@@ -18,7 +19,6 @@
 #define _SRC_ODBC_STATEMENT_H
 
 #include <napi.h>
-// #include <uv.h>
 
 class ODBCStatement : public Napi::ObjectWrap<ODBCStatement> {
   public:

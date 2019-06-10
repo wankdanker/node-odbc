@@ -1,4 +1,5 @@
 /*
+  Copyright (c) 2019, IBM
   Copyright (c) 2013, Dan VerWeire <dverweire@gmail.com>
   Copyright (c) 2010, Lee Smith<notwink@gmail.com>
 
@@ -103,14 +104,12 @@ SQLRETURN ODBCConnection::Free() {
     if (this->hDBC) {
       returnCode = SQLDisconnect(this->hDBC);
       if (!SQL_SUCCEEDED(returnCode)) {
-        printf("\nSQLDisconnect");
         uv_mutex_unlock(&ODBC::g_odbcMutex);
         return returnCode;
       }
 
       returnCode = SQLFreeHandle(SQL_HANDLE_DBC, this->hDBC);
       if (!SQL_SUCCEEDED(returnCode)) {
-        printf("\nSQLFreeHandle");
         uv_mutex_unlock(&ODBC::g_odbcMutex);
         return returnCode;
       }
@@ -126,7 +125,7 @@ Napi::Value ODBCConnection::ConnectedGetter(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   Napi::HandleScope scope(env);
 
-  SQLINTEGER connection;
+  SQLINTEGER connection = SQL_CD_TRUE;
 
   SQLGetConnectAttr(
     this->hDBC,               // ConnectionHandle
@@ -136,9 +135,7 @@ Napi::Value ODBCConnection::ConnectedGetter(const Napi::CallbackInfo& info) {
     NULL                      // StringLengthPtr
   );
 
-  if (connection == SQL_CD_TRUE) {
-    return Napi::Boolean::New(env, false);
-  } else if (connection == SQL_CD_FALSE) {
+  if (connection == SQL_CD_FALSE) { // connection dead is false
     return Napi::Boolean::New(env, true);
   }
 
@@ -257,10 +254,6 @@ Napi::Value ODBCConnection::Close(const Napi::CallbackInfo& info) {
 
   Napi::Env env = info.Env();
   Napi::HandleScope scope(env);
-
-  if (!info[0].IsFunction()) {
-
-  }
 
   Napi::Function callback = info[0].As<Napi::Function>();
 
@@ -385,9 +378,9 @@ class QueryAsyncWorker : public Napi::AsyncWorker {
 
       DEBUG_PRINTF("\nODBCConnection::QueryAsyncWorke::Execute");
 
-      // DEBUG_PRINTF("ODBCConnection::Query : sqlLen=%i, sqlSize=%i, sql=%s\n",
-      //          data->sqlLen, data->sqlSize, (char*)data->sql);
-
+      DEBUG_PRINTF("ODBCConnection::Query :sql=%s\n",
+               (char*)data->sql);
+      
       // allocate a new statement handle
       uv_mutex_lock(&ODBC::g_odbcMutex);
       data->sqlReturnCode = SQLAllocHandle(
@@ -468,7 +461,11 @@ class QueryAsyncWorker : public Napi::AsyncWorker {
       data(data) {}
 
     ~QueryAsyncWorker() {
-      //delete data;
+      uv_mutex_lock(&ODBC::g_odbcMutex);
+      this->data->sqlReturnCode = SQLFreeHandle(SQL_HANDLE_STMT, this->data->hSTMT);
+      this->data->hSTMT = SQL_NULL_HANDLE;
+      uv_mutex_unlock(&ODBC::g_odbcMutex);
+      delete data;
     }
 };
 
@@ -918,8 +915,8 @@ class TablesAsyncWorker : public Napi::AsyncWorker {
 
     void OnOK() {
 
-      DEBUG_PRINTF("ODBCConnection::QueryAsyncWorker::OnOk : data->sqlReturnCode=%i, \n", data->sqlReturnCode );
-
+      DEBUG_PRINTF("ODBCConnection::QueryAsyncWorker::OnOk : data->sqlReturnCode=%i\n", data->sqlReturnCode);
+  
       Napi::Env env = Env();
       Napi::HandleScope scope(env);
 
@@ -1039,16 +1036,6 @@ Napi::Value ODBCConnection::Tables(const Napi::CallbackInfo& info) {
 // ColumnsAsyncWorker, used by Columns function (see below)
 class ColumnsAsyncWorker : public Napi::AsyncWorker {
 
-  public:
-
-    ColumnsAsyncWorker(ODBCConnection *odbcConnectionObject, QueryData *data, Napi::Function& callback) : Napi::AsyncWorker(callback),
-      odbcConnectionObject(odbcConnectionObject),
-      data(data) {}
-
-    ~ColumnsAsyncWorker() {
-      delete data;
-    }
-
   private:
 
     ODBCConnection *odbcConnectionObject;
@@ -1093,6 +1080,16 @@ class ColumnsAsyncWorker : public Napi::AsyncWorker {
       callbackArguments.push_back(env.Null());
       callbackArguments.push_back(rows);
       Callback().Call(callbackArguments);
+    }
+
+  public:
+
+    ColumnsAsyncWorker(ODBCConnection *odbcConnectionObject, QueryData *data, Napi::Function& callback) : Napi::AsyncWorker(callback),
+      odbcConnectionObject(odbcConnectionObject),
+      data(data) {}
+
+    ~ColumnsAsyncWorker() {
+      delete data;
     }
 };
 

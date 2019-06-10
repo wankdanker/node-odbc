@@ -2,17 +2,19 @@
 
 require('dotenv').config();
 const assert = require('assert');
-const { Connection } = require('../../');
+const odbc = require('../../');
 
-describe('.callProcedure(procedureName, parameters, [callback])...', () => {
+describe.skip('.callProcedure(procedureName, parameters, [callback])...', () => {
   describe('...with callbacks...', () => {
-    it('...should place correct result in and out parameter.', (done) => {
+    it('...should place correct result in an out parameter.', (done) => {
       const array = [undefined];
-      const connection = new Connection(`${process.env.CONNECTION_STRING}`);
-      connection.callProcedure(null, `${process.env.DB_SCHEMA}`, `${process.env.DB_STOREDPROCEDURE}`, array, (error1, result1) => {
+      odbc.connect(`${process.env.CONNECTION_STRING}`, (error1, connection) => {
         assert.deepEqual(error1, null);
-        assert.notDeepEqual(result1, null);
-        done();
+        connection.callProcedure(null, `${process.env.DB_SCHEMA}`, `${process.env.DB_STOREDPROCEDURE}`, array, (error2, result2) => {
+          assert.deepEqual(error2, null);
+          assert.notDeepEqual(result2, null);
+          done();
+        });
       });
     });
   });

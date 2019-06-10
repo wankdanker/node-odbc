@@ -1,4 +1,5 @@
 /*
+  Copyright (c) 2019, IBM
   Copyright (c) 2013, Dan VerWeire<dverweire@gmail.com>
 
   Permission to use, copy, modify, and/or distribute this software for any
@@ -65,7 +66,7 @@ ODBCStatement::~ODBCStatement() {
 SQLRETURN ODBCStatement::Free() {
   DEBUG_PRINTF("ODBCStatement::Free\n");
 
-  if (this->data && this->data->hSTMT) {
+  if (this->data && this->data->hSTMT && this->data->hSTMT != SQL_NULL_HANDLE) {
     uv_mutex_lock(&ODBC::g_odbcMutex);
     this->data->sqlReturnCode = SQLFreeHandle(SQL_HANDLE_STMT, this->data->hSTMT);
     this->data->hSTMT = SQL_NULL_HANDLE;
@@ -96,9 +97,7 @@ class PrepareAsyncWorker : public Napi::AsyncWorker {
     ~PrepareAsyncWorker() {}
 
     void Execute() {
-
       DEBUG_PRINTF("ODBCStatement::PrepareAsyncWorker in Execute()\n");
-
       DEBUG_PRINTF("ODBCStatement::PrepareAsyncWorker hDBC=%p hDBC=%p hSTMT=%p\n",
        odbcStatementObject->hENV,
        odbcStatementObject->hDBC,

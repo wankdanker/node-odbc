@@ -1,4 +1,5 @@
 /*
+  Copyright (c) 2019, IBM
   Copyright (c) 2013, Dan VerWeire <dverweire@gmail.com>
   Copyright (c) 2010, Lee Smith <notwink@gmail.com>
 
@@ -83,11 +84,11 @@ typedef struct Parameter {
 } Parameter;
 
 typedef struct ColumnData {
-  SQLTCHAR *data;
+  SQLCHAR  *data;
   SQLLEN    size;
 
   ~ColumnData() {
-    delete this->data;
+    delete[] this->data;
   }
 
 } ColumnData;
@@ -105,7 +106,7 @@ typedef struct QueryData {
   // columns and rows
   Column                   **columns = NULL;
   SQLSMALLINT                columnCount;
-  SQLTCHAR                 **boundRow = NULL;
+  SQLCHAR                  **boundRow = NULL;
   std::vector<ColumnData*>   storedRows;
   SQLLEN                     rowCount;
 
@@ -132,19 +133,24 @@ typedef struct QueryData {
       }
     }
 
-    storedRows.clear();
-
     delete columns; columns = NULL;
     delete boundRow; boundRow = NULL;
     delete sql; sql = NULL;
   }
 
   void clear() {
-    if (this->bindValueCount > 0 || this->parameterCount > 0) {
+
+    for (size_t h = 0; h < this->storedRows.size(); h++) {
+      delete[] storedRows[h];
+    };
+
+    int numParameters = std::max(this->bindValueCount, this->parameterCount);
+
+    if (numParameters > 0) {
 
       Parameter* parameter;
 
-      for (int i = 0; i < this->bindValueCount; i++) {
+      for (int i = 0; i < numParameters; i++) {
         if (parameter = this->parameters[i], parameter->ParameterValuePtr != NULL) {
           switch (parameter->ValueType) {
             case SQL_C_SBIGINT:
@@ -158,34 +164,36 @@ typedef struct QueryData {
               break;
             case SQL_C_TCHAR:
             default:
-              delete (SQLTCHAR*)parameter->ParameterValuePtr;
+              delete[] (SQLTCHAR*)parameter->ParameterValuePtr;
               break;
           }
         }
         parameter->ParameterValuePtr = NULL;
+        delete parameter;
       }
 
-      delete this->parameters; this->parameters = NULL;
+      delete[] this->parameters; this->parameters = NULL;
       this->bindValueCount = 0;
       this->parameterCount = 0;
     }
 
     if (this->columnCount > 0) {
       for (int i = 0; i < this->columnCount; i++) {
-        delete this->columns[i]->ColumnName;
+        delete[] this->boundRow[i];
+        delete[] this->columns[i]->ColumnName;
         delete this->columns[i];
       }
     }
 
-    delete columns; columns = NULL;
-    delete boundRow; boundRow = NULL;
+    delete[] columns; columns = NULL;
+    delete[] boundRow; boundRow = NULL;
 
-    delete this->sql; this->sql = NULL;
-    delete this->catalog; this->catalog = NULL;
-    delete this->schema; this->schema = NULL;
-    delete this->table; this->table = NULL;
-    delete this->type; this->type = NULL;
-    delete this->column; this->column = NULL;
+    delete[] this->sql; this->sql = NULL;
+    delete[] this->catalog; this->catalog = NULL;
+    delete[] this->schema; this->schema = NULL;
+    delete[] this->table; this->table = NULL;
+    delete[] this->type; this->type = NULL;
+    delete[] this->column; this->column = NULL;
   }
 
 } QueryData;
@@ -219,8 +227,6 @@ class ODBC {
     ~ODBC();
 
     static Napi::Value Connect(const Napi::CallbackInfo& info);
-    static Napi::Value ConnectSync(const Napi::CallbackInfo& info);
-    static Napi::Value ConnectMany(const Napi::CallbackInfo& info);
 
     #ifdef dynodbc
     static Napi::Value LoadODBCLibrary(const Napi::CallbackInfo& info);

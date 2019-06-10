@@ -1,15 +1,15 @@
 {
   "name": "odbc",
   "description": "unixodbc bindings for node",
-  "version": "2.0.0-beta.0",
-  "homepage": "http://github.com/wankdanker/node-odbc/",
+  "version": "2.0.0",
+  "homepage": "http://github.com/markdirish/node-odbc/",
   "main": "./lib/odbc.js",
   "repository": {
     "type": "git",
-    "url": "git://github.com/wankdanker/node-odbc.git"
+    "url": "git://github.com/markdirish/node-odbc.git"
   },
   "bugs": {
-    "url": "https://github.com/w1nk/node-odbc/issues"
+    "url": "https://github.com/markdirish/node-odbc/issues"
   },
   "contributors": [
     {
@@ -36,11 +36,12 @@
     "test": "mocha --slow 5000 --timeout 10000"
   },
   "dependencies": {
-    "dotenv": "^6.2.0",
     "node-addon-api": "^1.3.0"
   },
   "gypfile": true,
   "devDependencies": {
+    "async": "^3.0.1",
+    "dotenv": "^6.2.0",
     "eslint": "^5.13.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
