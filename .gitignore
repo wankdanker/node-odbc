@@ -8,3 +8,12 @@ core
 oldtest
 .env
 .vscode/
+.history
+
+build
+build/*
+
+*.log
+*.tmp
+tmp.*
+0.*
