@@ -609,7 +609,7 @@ class CallProcedureAsyncWorker : public Napi::AsyncWorker {
       data->sqlReturnCode = ODBC::RetrieveResultSet(data);
       ASYNC_WORKER_CHECK_CODE_SET_ERROR_RETURN(data->sqlReturnCode, SQL_HANDLE_STMT, data->hSTMT, "QueryAsyncWorker::Execute", "ODBC::RetrieveResultSet");
 
-      data->parameterCount = data->storedRows.size();
+      data->parameterCount = (SQLSMALLINT)data->storedRows.size();
       if (data->bindValueCount != (SQLSMALLINT)data->storedRows.size()) {
         SetError("[Node.js::odbc] The number of parameters in the procedure and the number of passes parameters is not equal.");
         return;

@@ -845,7 +845,7 @@ Napi::Array ODBC::ProcessDataForNapi(Napi::Env env, QueryData *data) {
 
       delete storedRow[j].data;
     }
-    rows.Set(i, row);
+    rows.Set( (uint32_t)i, row);
   }
 
   storedRows->clear();
