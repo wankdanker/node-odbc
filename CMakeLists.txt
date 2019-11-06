@@ -1,14 +1,30 @@
 project (odbc)
 cmake_minimum_required(VERSION 3.10)
 
+message( STATUS "VOID pointer size = " ${CMAKE_SIZEOF_VOID_P} )
+# message( WARNING ${CMAKE_SIZEOF_VOID_P} )
+
+# if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+#     # 64 bits
+# elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+#     # 32 bits
+# endif()
+
+# Platform Specific LIBS
+if(LINUX)
+  set( LINK_LIBS odbc )
+elseif(MACOS)
+  set( LINK_LIBS odbc )
+elseif(WIN32)
+  set( LINK_LIBS odbc32.lib odbccp32.lib )
+endif()
+
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(module_include_dir "${PROJECT_SOURCE_DIR}/src")
+set(module_source_dir "${PROJECT_SOURCE_DIR}/src")
 
-set(odbc_include_dir "${PROJECT_SOURCE_DIR}/src")
-set(odbc_source_dir "${PROJECT_SOURCE_DIR}/src")
-
-set( LINK_LIBS odbc32.lib odbccp32.lib )
 
 # Include N-API wrappers
 execute_process(COMMAND node -p "require('node-addon-api').include"
@@ -20,15 +36,15 @@ string(REPLACE "\"" "" NODE_ADDON_API_DIR ${NODE_ADDON_API_DIR})
 include_directories(${CMAKE_JS_INC})
 
 file(GLOB SOURCE_FILES
-        "${odbc_include_dir}/dynodbc.h"
-        "${odbc_include_dir}/odbc.h"
-        "${odbc_include_dir}/odbc_connection.h"
-        "${odbc_include_dir}/odbc_statement.h"
-        "${odbc_include_dir}/strptime.h"
-        "${odbc_source_dir}/dynodbc.cpp"
-        "${odbc_source_dir}/odbc.cpp"
-        "${odbc_source_dir}/odbc_connection.cpp"
-        "${odbc_source_dir}/odbc_statement.cpp"
+        "${module_include_dir}/dynodbc.h"
+        "${module_include_dir}/odbc.h"
+        "${module_include_dir}/odbc_connection.h"
+        "${module_include_dir}/odbc_statement.h"
+        "${module_include_dir}/strptime.h"
+        "${module_source_dir}/dynodbc.cpp"
+        "${module_source_dir}/odbc.cpp"
+        "${module_source_dir}/odbc_connection.cpp"
+        "${module_source_dir}/odbc_statement.cpp"
 )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC} )
