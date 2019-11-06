@@ -10,13 +10,13 @@ message( STATUS "VOID pointer size = " ${CMAKE_SIZEOF_VOID_P} )
 #     # 32 bits
 # endif()
 
-# Platform Specific LIBS
+# To set platform specific LIBS
 if(LINUX)
-  set( LINK_LIBS odbc )
-elseif(MACOS)
   set( LINK_LIBS odbc )
 elseif(WIN32)
   set( LINK_LIBS odbc32.lib odbccp32.lib )
+else()
+  set( LINK_LIBS odbc )
 endif()
 
 set(CMAKE_CXX_STANDARD 11)
@@ -24,7 +24,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(module_include_dir "${PROJECT_SOURCE_DIR}/src")
 set(module_source_dir "${PROJECT_SOURCE_DIR}/src")
-
 
 # Include N-API wrappers
 execute_process(COMMAND node -p "require('node-addon-api').include"
