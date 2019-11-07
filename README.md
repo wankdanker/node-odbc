@@ -23,6 +23,32 @@ When all these steps have been completed, install `node-odbc` into your Node.js 
 ```bash
 npm install odbc
 ```
+
+## Local build with CMake
+
+##### local build prerequisite
+- [node.js](https://nodejs.org/en/) (v10 or higher)
+- [CMake](https://cmake.org/) (v3.10 or higher)
+- [cmake.js](https://github.com/cmake-js/cmake-js) (v6 or higher)
+
+```bash
+# To start the build
+cd node-odbc
+
+cmake-js build
+# or
+cmake-js build --debug
+
+# build using Visual Studio
+cmake-js -G "Visual Studio 15 2017 Win64"
+cmake-js -G "Visual Studio 16 2019" -A x64
+cmake-js -G "Visual Studio 16 2019" -A ARM
+cmake-js -G "Visual Studio 16 2019" -A ARM64
+
+# FYI: cmake-js can be installed by using
+npm install -g cmake-js
+```
+
 ---
 
 ## Important Changes in 2.0
