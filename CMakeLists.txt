@@ -2,7 +2,6 @@ project (odbc)
 cmake_minimum_required(VERSION 3.10)
 
 message( STATUS "VOID pointer size = " ${CMAKE_SIZEOF_VOID_P} )
-# message( WARNING ${CMAKE_SIZEOF_VOID_P} )
 
 # if(CMAKE_SIZEOF_VOID_P EQUAL 8)
 #     # 64 bits
@@ -12,12 +11,15 @@ message( STATUS "VOID pointer size = " ${CMAKE_SIZEOF_VOID_P} )
 
 # To set platform specific LIBS
 if(LINUX)
-  set( LINK_LIBS odbc )
+  set( LINK_LIBS  )
 elseif(WIN32)
   set( LINK_LIBS odbc32.lib odbccp32.lib )
 else()
-  set( LINK_LIBS odbc )
+  set( LINK_LIBS )
 endif()
+
+# let us print the LINK_LIBS we set for debug purpus only
+message( STATUS "LINK_LIBS = " ${LINK_LIBS} )
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
