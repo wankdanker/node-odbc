@@ -28,9 +28,7 @@
 #include "dynodbc.h"
 #else
 #include <sql.h>
-#include <sqltypes.h>
 #include <sqlext.h>
-#include <sqlucode.h>
 #endif
 
 using namespace v8;
