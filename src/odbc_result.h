@@ -23,7 +23,7 @@ class ODBCResult : public Nan::ObjectWrap {
   public:
    static Nan::Persistent<String> OPTION_FETCH_MODE;
    static Nan::Persistent<Function> constructor;
-   static void Init(v8::Handle<Object> exports);
+   static void Init(Local<Object> exports);
    
    void Free();
    
@@ -79,6 +79,7 @@ protected:
       int errorCount;
       Nan::Persistent<Array> rows;
       Nan::Persistent<Object> objError;
+      Isolate* isolate;
     };
     
     ODBCResult *self(void) { return this; }

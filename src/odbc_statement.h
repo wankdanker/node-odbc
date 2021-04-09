@@ -22,7 +22,7 @@
 class ODBCStatement : public Nan::ObjectWrap {
   public:
    static Nan::Persistent<Function> constructor;
-   static void Init(v8::Handle<Object> exports);
+   static void Init(Local<Object> exports);
    
    void Free();
    

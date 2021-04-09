@@ -8,7 +8,7 @@ db.openSync(common.connectionString);
 var data;
 
 try {
-  data = db.querySync("select 'ꜨꜢ' as UNICODETEXT");
+  data = db.querySync("select N'ꜨꜢ' as UNICODETEXT");
 }
 catch (e) {
   console.log(e.stack);

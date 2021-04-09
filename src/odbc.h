@@ -76,21 +76,21 @@ class ODBC : public Nan::ObjectWrap {
     static Nan::Persistent<Function> constructor;
     static uv_mutex_t g_odbcMutex;
     
-    static void Init(v8::Handle<Object> exports);
+    static NAN_MODULE_INIT(Init);
     static Column* GetColumns(SQLHSTMT hStmt, short* colCount);
     static void FreeColumns(Column* columns, short* colCount);
-    static Handle<Value> GetColumnValue(SQLHSTMT hStmt, Column column, uint16_t* buffer, int bufferLength);
-    static Local<Value> GetRecordTuple (SQLHSTMT hStmt, Column* columns, short* colCount, uint16_t* buffer, int bufferLength);
-    static Local<Value> GetRecordArray (SQLHSTMT hStmt, Column* columns, short* colCount, uint16_t* buffer, int bufferLength);
-    static Handle<Value> CallbackSQLError(SQLSMALLINT handleType, SQLHANDLE handle, Nan::Callback* cb);
+    static Local<Value> GetColumnValue(SQLHSTMT hStmt, Column column, uint16_t* buffer, int bufferLength, Isolate* isolate);
+    static Local<Value> GetRecordTuple (SQLHSTMT hStmt, Column* columns, short* colCount, uint16_t* buffer, int bufferLength, Isolate* isolate);
+    static Local<Value> GetRecordArray (SQLHSTMT hStmt, Column* columns, short* colCount, uint16_t* buffer, int bufferLength, Isolate* isolate);
+    static Nan::MaybeLocal<Value> CallbackSQLError(SQLSMALLINT handleType, SQLHANDLE handle, Nan::Callback* cb);
     static Local<Value> CallbackSQLError (SQLSMALLINT handleType, SQLHANDLE handle, char* message, Nan::Callback* cb);
     static Local<Object> GetSQLError (SQLSMALLINT handleType, SQLHANDLE handle);
     static Local<Object> GetSQLError (SQLSMALLINT handleType, SQLHANDLE handle, char* message);
-    static Local<Array>  GetAllRecordsSync (HENV hENV, HDBC hDBC, HSTMT hSTMT, uint16_t* buffer, int bufferLength);
+    static Local<Array>  GetAllRecordsSync (HENV hENV, HDBC hDBC, HSTMT hSTMT, uint16_t* buffer, int bufferLength, Isolate* isolate);
 #ifdef dynodbc
     static NAN_METHOD(LoadODBCLibrary);
 #endif
-    static Parameter* GetParametersFromArray (Local<Array> values, int* paramCount);
+    static Parameter* GetParametersFromArray (Local<Array> values, int* paramCount, Isolate* isolate);
     
     void Free();
     
@@ -184,25 +184,25 @@ struct query_request {
 #define REQ_WSTR_ARG(I, VAR)                                            \
   if (info.Length() <= (I) || !info[I]->IsString())                     \
     return Nan::ThrowTypeError("Argument " #I " must be a string");       \
-  String::Value VAR(info[I]->ToString());
+  Local<String> VAR(Local<String>::Cast(info[I]));
 
 //Require String Argument; Save String as Object
 #define REQ_STRO_ARG(I, VAR)                                            \
   if (info.Length() <= (I) || !info[I]->IsString())                     \
     return Nan::ThrowTypeError("Argument " #I " must be a string");       \
-  Local<String> VAR(info[I]->ToString());
+  Local<String> VAR(Local<String>::Cast(info[I]));
 
 //Require String or Null Argument; Save String as Utf8
 #define REQ_STR_OR_NULL_ARG(I, VAR)                                             \
   if ( info.Length() <= (I) || (!info[I]->IsString() && !info[I]->IsNull()) )   \
     return Nan::ThrowTypeError("Argument " #I " must be a string or null");       \
-  String::Utf8Value VAR(info[I]->ToString());
+  String::Utf8Value VAR(Local<String>::Cast(info[I]));
 
 //Require String or Null Argument; Save String as Wide String (UCS2)
 #define REQ_WSTR_OR_NULL_ARG(I, VAR)                                              \
   if ( info.Length() <= (I) || (!info[I]->IsString() && !info[I]->IsNull()) )     \
     return Nan::ThrowTypeError("Argument " #I " must be a string or null");         \
-  String::Value VAR(info[I]->ToString());
+  String::Value VAR Nan::Utf8String((Local<String>::Cast(info[I])));
 
 //Require String or Null Argument; save String as String Object
 #define REQ_STRO_OR_NULL_ARG(I, VAR)                                              \
@@ -210,7 +210,7 @@ struct query_request {
     Nan::ThrowTypeError("Argument " #I " must be a string or null");                \
     return;                                                         \
   }                                                                               \
-  Local<String> VAR(info[I]->ToString());
+  Local<String> VAR(Local<String>::Cast(info[I]));
 
 #define REQ_FUN_ARG(I, VAR)                                             \
   if (info.Length() <= (I) || !info[I]->IsFunction())                   \
@@ -220,7 +220,7 @@ struct query_request {
 #define REQ_BOOL_ARG(I, VAR)                                            \
   if (info.Length() <= (I) || !info[I]->IsBoolean())                    \
     return Nan::ThrowTypeError("Argument " #I " must be a boolean");      \
-  Local<Boolean> VAR = (info[I]->ToBoolean());
+  Local<Boolean> VAR = Local<Boolean>::Cast(info[I]);
 
 #define REQ_EXT_ARG(I, VAR)                                             \
   if (info.Length() <= (I) || !info[I]->IsExternal())                   \
@@ -232,7 +232,7 @@ struct query_request {
   if (info.Length() <= (I)) {                                           \
     VAR = (DEFAULT);                                                    \
           } else if (info[I]->IsInt32()) {                                      \
-    VAR = info[I]->Int32Value();                                        \
+    VAR = Local<Int32>::Cast(info[I])->Value();                                        \
   } else {                                                              \
     return Nan::ThrowTypeError("Argument " #I " must be an integer");     \
   }

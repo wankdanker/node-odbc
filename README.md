@@ -1,3 +1,8 @@
+note
+----
+
+This is the code for odbc@1.x.x. More recent versions are here: github.com/markdirish/node-odbc/
+
 node-odbc
 ---------
 
