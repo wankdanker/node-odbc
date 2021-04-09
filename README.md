@@ -1,14 +1,7 @@
-# node-odbc 2.0.0 is now in beta!
-A new version of `odbc` has been released in beta! The initial release of this beta can be found at [https://www.npmjs.com/package/odbc/v/2.0.0-beta.0](https://www.npmjs.com/package/odbc/v/2.0.0-beta.0), while later releases can be found under the Versions tab on npm. This URL contains information including the README file outlining the new API.
+note
+----
 
-To install the beta version, include the `beta` tag with your command:
-```
-npm install odbc@beta
-```
-
-Test it out and give feedback on the issues of the official git repository!
-
----
+This is the code for odbc@1.x.x. More recent versions are here: github.com/markdirish/node-odbc/
 
 node-odbc
 ---------

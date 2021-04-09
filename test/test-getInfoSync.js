@@ -4,7 +4,8 @@ var common = require("./common")
   , assert = require("assert");
 
 db.openSync(common.connectionString);
-console.log(common);
+
 var userName = db.conn.getInfoSync(odbc.SQL_USER_NAME);
+console.log(userName, common.user, odbc.SQL_USER_NAME);
 assert.equal(userName, common.user);
 

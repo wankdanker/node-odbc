@@ -31,7 +31,7 @@ using namespace node;
 
 Nan::Persistent<Function> ODBCStatement::constructor;
 
-void ODBCStatement::Init(v8::Handle<Object> exports) {
+void ODBCStatement::Init(Local<Object> exports) {
   DEBUG_PRINTF("ODBCStatement::Init\n");
   Nan::HandleScope scope;
 
@@ -64,8 +64,10 @@ void ODBCStatement::Init(v8::Handle<Object> exports) {
   Nan::SetPrototypeMethod(t, "closeSync", CloseSync);
 
   // Attach the Database Constructor to the target object
-  constructor.Reset(t->GetFunction());
-  exports->Set(Nan::New("ODBCStatement").ToLocalChecked(), t->GetFunction());
+  constructor.Reset(Nan::GetFunction(t).ToLocalChecked());
+  Nan::Set(exports,
+    Nan::New("ODBCStatement").ToLocalChecked(),
+    Nan::GetFunction(t).ToLocalChecked());
 }
 
 ODBCStatement::~ODBCStatement() {
@@ -442,11 +444,11 @@ NAN_METHOD(ODBCStatement::ExecuteDirect) {
 #ifdef UNICODE
   data->sqlLen = sql->Length();
   data->sql = (uint16_t *) malloc((data->sqlLen * sizeof(uint16_t)) + sizeof(uint16_t));
-  sql->Write((uint16_t *) data->sql);
+  sql->Write(info.GetIsolate(), (uint16_t *) data->sql);
 #else
   data->sqlLen = sql->Utf8Length();
   data->sql = (char *) malloc(data->sqlLen +1);
-  sql->WriteUtf8((char *) data->sql);
+  sql->WriteUtf8(info.GetIsolate(), (char *) data->sql);
 #endif
 
   data->stmt = stmt;
@@ -546,8 +548,8 @@ NAN_METHOD(ODBCStatement::ExecuteDirectSync) {
   
   SQLRETURN ret = SQLExecDirect(
     stmt->m_hSTMT,
-    (SQLTCHAR *) *sql, 
-    sql.length());  
+    (SQLTCHAR *) *Nan::Utf8String(sql), 
+    sql->Length());  
 
   if(ret == SQL_ERROR) {
     Local<Value> objError = ODBC::GetSQLError(
@@ -594,11 +596,11 @@ NAN_METHOD(ODBCStatement::PrepareSync) {
 #ifdef UNICODE
   int sqlLen = sql->Length() + 1;
   uint16_t* sql2 = (uint16_t *) malloc(sqlLen * sizeof(uint16_t));
-  sql->Write(sql2);
+  sql->Write(info.GetIsolate(), sql2);
 #else
   int sqlLen = sql->Utf8Length() + 1;
   char* sql2 = (char *) malloc(sqlLen);
-  sql->WriteUtf8(sql2);
+  sql->WriteUtf8(info.GetIsolate(), sql2);
 #endif
   
   ret = SQLPrepare(
@@ -647,11 +649,11 @@ NAN_METHOD(ODBCStatement::Prepare) {
 #ifdef UNICODE
   data->sqlLen = sql->Length();
   data->sql = (uint16_t *) malloc((data->sqlLen * sizeof(uint16_t)) + sizeof(uint16_t));
-  sql->Write((uint16_t *) data->sql);
+  sql->Write(info.GetIsolate(), (uint16_t *) data->sql);
 #else
   data->sqlLen = sql->Utf8Length();
   data->sql = (char *) malloc(data->sqlLen +1);
-  sql->WriteUtf8((char *) data->sql);
+  sql->WriteUtf8(info.GetIsolate(), (char *) data->sql);
 #endif
   
   data->stmt = stmt;
@@ -784,7 +786,8 @@ NAN_METHOD(ODBCStatement::BindSync) {
   
   stmt->params = ODBC::GetParametersFromArray(
     Local<Array>::Cast(info[0]), 
-    &stmt->paramCount);
+    &stmt->paramCount,
+    info.GetIsolate());
   
   SQLRETURN ret = SQL_SUCCESS;
   Parameter prm;
@@ -892,7 +895,8 @@ NAN_METHOD(ODBCStatement::Bind) {
   
   data->stmt->params = ODBC::GetParametersFromArray(
     Local<Array>::Cast(info[0]), 
-    &data->stmt->paramCount);
+    &data->stmt->paramCount,
+    info.GetIsolate());
   
   work_req->data = data;
   

@@ -15,6 +15,7 @@ common.dropTables(db, function () {
     }, function (err, data) {
       db.closeSync();
       assert.ok(data.length, "No records returned when attempting to describe the tabe " + common.tableName);
+      console.error(data)
     });
   });
 });

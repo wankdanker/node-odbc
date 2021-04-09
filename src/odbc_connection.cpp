@@ -35,7 +35,7 @@ Nan::Persistent<String> ODBCConnection::OPTION_SQL;
 Nan::Persistent<String> ODBCConnection::OPTION_PARAMS;
 Nan::Persistent<String> ODBCConnection::OPTION_NORESULTS;
 
-void ODBCConnection::Init(v8::Handle<Object> exports) {
+void ODBCConnection::Init(Local<Object> exports) {
   DEBUG_PRINTF("ODBCConnection::Init\n");
   Nan::HandleScope scope;
 
@@ -43,44 +43,47 @@ void ODBCConnection::Init(v8::Handle<Object> exports) {
   OPTION_PARAMS.Reset(Nan::New<String>("params").ToLocalChecked());
   OPTION_NORESULTS.Reset(Nan::New<String>("noResults").ToLocalChecked());
 
-  Local<FunctionTemplate> constructor_template = Nan::New<FunctionTemplate>(New);
+  Local<FunctionTemplate> t = Nan::New<FunctionTemplate>(New);
 
   // Constructor Template
-  constructor_template->SetClassName(Nan::New("ODBCConnection").ToLocalChecked());
+  t->SetClassName(Nan::New("ODBCConnection").ToLocalChecked());
 
   // Reserve space for one Handle<Value>
-  Local<ObjectTemplate> instance_template = constructor_template->InstanceTemplate();
-  instance_template->SetInternalFieldCount(1);
+  Local<ObjectTemplate> i = t->InstanceTemplate();
+  i->SetInternalFieldCount(1);
   
   // Properties
-  //Nan::SetAccessor(instance_template, Nan::New("mode").ToLocalChecked(), ModeGetter, ModeSetter);
-  Nan::SetAccessor(instance_template, Nan::New("connected").ToLocalChecked(), ConnectedGetter);
-  Nan::SetAccessor(instance_template, Nan::New("connectTimeout").ToLocalChecked(), ConnectTimeoutGetter, ConnectTimeoutSetter);
-  Nan::SetAccessor(instance_template, Nan::New("loginTimeout").ToLocalChecked(), LoginTimeoutGetter, LoginTimeoutSetter);
+  //Nan::SetAccessor(i, Nan::New("mode").ToLocalChecked(), ModeGetter, ModeSetter);
+  Nan::SetAccessor(i, Nan::New("connected").ToLocalChecked(), ConnectedGetter);
+  Nan::SetAccessor(i, Nan::New("connectTimeout").ToLocalChecked(), ConnectTimeoutGetter, ConnectTimeoutSetter);
+  Nan::SetAccessor(i, Nan::New("loginTimeout").ToLocalChecked(), LoginTimeoutGetter, LoginTimeoutSetter);
   
   // Prototype Methods
-  Nan::SetPrototypeMethod(constructor_template, "open", Open);
-  Nan::SetPrototypeMethod(constructor_template, "openSync", OpenSync);
-  Nan::SetPrototypeMethod(constructor_template, "close", Close);
-  Nan::SetPrototypeMethod(constructor_template, "closeSync", CloseSync);
-  Nan::SetPrototypeMethod(constructor_template, "createStatement", CreateStatement);
-  Nan::SetPrototypeMethod(constructor_template, "createStatementSync", CreateStatementSync);
-  Nan::SetPrototypeMethod(constructor_template, "query", Query);
-  Nan::SetPrototypeMethod(constructor_template, "querySync", QuerySync);
+  Nan::SetPrototypeMethod(t, "open", Open);
+  Nan::SetPrototypeMethod(t, "openSync", OpenSync);
+  Nan::SetPrototypeMethod(t, "close", Close);
+  Nan::SetPrototypeMethod(t, "closeSync", CloseSync);
+  Nan::SetPrototypeMethod(t, "createStatement", CreateStatement);
+  Nan::SetPrototypeMethod(t, "createStatementSync", CreateStatementSync);
+  Nan::SetPrototypeMethod(t, "query", Query);
+  Nan::SetPrototypeMethod(t, "querySync", QuerySync);
   
-  Nan::SetPrototypeMethod(constructor_template, "beginTransaction", BeginTransaction);
-  Nan::SetPrototypeMethod(constructor_template, "beginTransactionSync", BeginTransactionSync);
-  Nan::SetPrototypeMethod(constructor_template, "endTransaction", EndTransaction);
-  Nan::SetPrototypeMethod(constructor_template, "endTransactionSync", EndTransactionSync);
+  Nan::SetPrototypeMethod(t, "beginTransaction", BeginTransaction);
+  Nan::SetPrototypeMethod(t, "beginTransactionSync", BeginTransactionSync);
+  Nan::SetPrototypeMethod(t, "endTransaction", EndTransaction);
+  Nan::SetPrototypeMethod(t, "endTransactionSync", EndTransactionSync);
 
-  Nan::SetPrototypeMethod(constructor_template, "getInfoSync", GetInfoSync);
+  Nan::SetPrototypeMethod(t, "getInfoSync", GetInfoSync);
 
-  Nan::SetPrototypeMethod(constructor_template, "columns", Columns);
-  Nan::SetPrototypeMethod(constructor_template, "tables", Tables);
+  Nan::SetPrototypeMethod(t, "columns", Columns);
+  Nan::SetPrototypeMethod(t, "tables", Tables);
   
   // Attach the Database Constructor to the target object
-  constructor.Reset(constructor_template->GetFunction());
-  exports->Set( Nan::New("ODBCConnection").ToLocalChecked(), constructor_template->GetFunction());
+  constructor.Reset(Nan::GetFunction(t).ToLocalChecked());
+
+  Nan::Set(exports,
+    Nan::New("ODBCConnection").ToLocalChecked(),
+    Nan::GetFunction(t).ToLocalChecked());
 }
 
 ODBCConnection::~ODBCConnection() {
@@ -151,7 +154,7 @@ NAN_SETTER(ODBCConnection::ConnectTimeoutSetter) {
   ODBCConnection *obj = Nan::ObjectWrap::Unwrap<ODBCConnection>(info.Holder());
   
   if (value->IsNumber()) {
-    obj->connectTimeout = value->Uint32Value();
+    obj->connectTimeout = Nan::To<uint32_t>(value).FromJust();
   }
 }
 
@@ -169,7 +172,7 @@ NAN_SETTER(ODBCConnection::LoginTimeoutSetter) {
   ODBCConnection *obj = Nan::ObjectWrap::Unwrap<ODBCConnection>(info.Holder());
   
   if (value->IsNumber()) {
-    obj->loginTimeout = value->Uint32Value();
+    obj->loginTimeout = Nan::To<uint32_t>(value).FromJust();
   }
 }
 
@@ -200,11 +203,11 @@ NAN_METHOD(ODBCConnection::Open) {
 #ifdef UNICODE
   data->connectionLength = connection->Length() + 1;
   data->connection = (uint16_t *) malloc(sizeof(uint16_t) * data->connectionLength);
-  connection->Write((uint16_t*) data->connection);
+  connection->Write(info.GetIsolate(), (uint16_t*) data->connection);
 #else
   data->connectionLength = connection->Utf8Length() + 1;
   data->connection = (char *) malloc(sizeof(char) * data->connectionLength);
-  connection->WriteUtf8((char*) data->connection);
+  connection->WriteUtf8(info.GetIsolate(), (char*) data->connection);
 #endif
   
   data->cb = new Nan::Callback(cb);
@@ -349,11 +352,11 @@ NAN_METHOD(ODBCConnection::OpenSync) {
 #ifdef UNICODE
   int connectionLength = connection->Length() + 1;
   uint16_t* connectionString = (uint16_t *) malloc(connectionLength * sizeof(uint16_t));
-  connection->Write(connectionString);
+  connection->Write(info.GetIsolate(), connectionString);
 #else
   int connectionLength = connection->Utf8Length() + 1;
   char* connectionString = (char *) malloc(connectionLength);
-  connection->WriteUtf8(connectionString);
+  connection->WriteUtf8(info.GetIsolate(), connectionString);
 #endif
   
   uv_mutex_lock(&ODBC::g_odbcMutex);
@@ -697,11 +700,12 @@ NAN_METHOD(ODBCConnection::Query) {
       return Nan::ThrowTypeError("Argument 2 must be a Function.");
     }
 
-    sql = info[0]->ToString();
+    sql = Local<String>::Cast(info[0]);
     
     data->params = ODBC::GetParametersFromArray(
       Local<Array>::Cast(info[1]),
-      &data->paramCount);
+      &data->paramCount,
+      info.GetIsolate());
     
     cb = Local<Function>::Cast(info[2]);
   }
@@ -717,7 +721,7 @@ NAN_METHOD(ODBCConnection::Query) {
     if (info[0]->IsString()) {
       //handle Query("sql", function cb () {})
       
-      sql = info[0]->ToString();
+      sql = Local<String>::Cast(info[0]);
       
       data->paramCount = 0;
     }
@@ -727,29 +731,30 @@ NAN_METHOD(ODBCConnection::Query) {
       //specify options on an options object.
       //handle Query({}, function cb () {});
       
-      Local<Object> obj = info[0]->ToObject();
+      Local<Object> obj = Local<Object>::Cast(info[0]);
       
       Local<String> optionSqlKey = Nan::New(OPTION_SQL);
-      if (obj->Has(optionSqlKey) && obj->Get(optionSqlKey)->IsString()) {
-        sql = obj->Get(optionSqlKey)->ToString();
+      if (Nan::Has(obj, optionSqlKey).FromJust() && Nan::Get(obj, optionSqlKey).ToLocalChecked()->IsString()) {
+        sql = Local<String>::Cast(Nan::Get(obj, optionSqlKey).ToLocalChecked());
       }
       else {
         sql = Nan::New("").ToLocalChecked();
       }
       
       Local<String> optionParamsKey = Nan::New(OPTION_PARAMS);
-      if (obj->Has(optionParamsKey) && obj->Get(optionParamsKey)->IsArray()) {
+      if (Nan::Has(obj, optionParamsKey).FromJust() && Nan::Get(obj, optionParamsKey).ToLocalChecked()->IsArray()) {
         data->params = ODBC::GetParametersFromArray(
-          Local<Array>::Cast(obj->Get(optionParamsKey)),
-          &data->paramCount);
+          Local<Array>::Cast(Nan::Get(obj, optionParamsKey).ToLocalChecked()),
+          &data->paramCount,
+          info.GetIsolate());
       }
       else {
         data->paramCount = 0;
       }
       
       Local<String> optionNoResultsKey = Nan::New(OPTION_NORESULTS);
-      if (obj->Has(optionNoResultsKey) && obj->Get(optionNoResultsKey)->IsBoolean()) {
-        data->noResultObject = obj->Get(optionNoResultsKey)->ToBoolean()->Value();
+      if (Nan::Has(obj, optionNoResultsKey).FromJust() && Nan::Get(obj, optionNoResultsKey).ToLocalChecked()->IsBoolean()) {
+        data->noResultObject = Local<Boolean>::Cast(Nan::Get(obj, optionNoResultsKey).ToLocalChecked())->Value();
       }
       else {
         data->noResultObject = false;
@@ -770,12 +775,12 @@ NAN_METHOD(ODBCConnection::Query) {
   data->sqlLen = sql->Length();
   data->sqlSize = (data->sqlLen * sizeof(uint16_t)) + sizeof(uint16_t);
   data->sql = (uint16_t *) malloc(data->sqlSize);
-  sql->Write((uint16_t *) data->sql);
+  sql->Write(info.GetIsolate(), (uint16_t *) data->sql);
 #else
   data->sqlLen = sql->Utf8Length();
   data->sqlSize = data->sqlLen + 1;
   data->sql = (char *) malloc(data->sqlSize);
-  sql->WriteUtf8((char *) data->sql);
+  sql->WriteUtf8(info.GetIsolate(), (char *) data->sql);
 #endif
 
   DEBUG_PRINTF("ODBCConnection::Query : sqlLen=%i, sqlSize=%i, sql=%s\n",
@@ -947,11 +952,7 @@ NAN_METHOD(ODBCConnection::QuerySync) {
   DEBUG_PRINTF("ODBCConnection::QuerySync\n");
   Nan::HandleScope scope;
 
-#ifdef UNICODE
-  String::Value* sql;
-#else
-  String::Utf8Value* sql;
-#endif
+  Local<String> sql;
 
   ODBCConnection* conn = Nan::ObjectWrap::Unwrap<ODBCConnection>(info.Holder());
   
@@ -973,15 +974,12 @@ NAN_METHOD(ODBCConnection::QuerySync) {
       return Nan::ThrowTypeError("ODBCConnection::QuerySync(): Argument 1 must be an Array.");
     }
 
-#ifdef UNICODE
-    sql = new String::Value(info[0]->ToString());
-#else
-    sql = new String::Utf8Value(info[0]->ToString());
-#endif
+    sql = Local<String>::Cast(info[0]);
 
     params = ODBC::GetParametersFromArray(
       Local<Array>::Cast(info[1]),
-      &paramCount);
+      &paramCount,
+      info.GetIsolate());
 
   }
   else if (info.Length() == 1 ) {
@@ -989,11 +987,7 @@ NAN_METHOD(ODBCConnection::QuerySync) {
 
     if (info[0]->IsString()) {
       //handle Query("sql")
-#ifdef UNICODE
-      sql = new String::Value(info[0]->ToString());
-#else
-      sql = new String::Utf8Value(info[0]->ToString());
-#endif
+      sql = Local<String>::Cast(info[0]);
     
       paramCount = 0;
     }
@@ -1003,37 +997,30 @@ NAN_METHOD(ODBCConnection::QuerySync) {
       //specify options on an options object.
       //handle Query({}, function cb () {});
       
-      Local<Object> obj = info[0]->ToObject();
+      Local<Object> obj = Local<Object>::Cast(info[0]);
       
       Local<String> optionSqlKey = Nan::New<String>(OPTION_SQL);
-      if (obj->Has(optionSqlKey) && obj->Get(optionSqlKey)->IsString()) {
-#ifdef UNICODE
-        sql = new String::Value(obj->Get(optionSqlKey)->ToString());
-#else
-        sql = new String::Utf8Value(obj->Get(optionSqlKey)->ToString());
-#endif
+      if (Nan::Has(obj, optionSqlKey).FromJust() && Nan::Get(obj, optionSqlKey).ToLocalChecked()->IsString()) {
+        sql = Local<String>::Cast(Nan::Get(obj, optionSqlKey).ToLocalChecked());
       }
       else {
-#ifdef UNICODE
-        sql = new String::Value(Nan::New("").ToLocalChecked());
-#else
-        sql = new String::Utf8Value(Nan::New("").ToLocalChecked());
-#endif
+        sql = Nan::New("").ToLocalChecked();
       }
 
       Local<String> optionParamsKey = Nan::New(OPTION_PARAMS);
-      if (obj->Has(optionParamsKey) && obj->Get(optionParamsKey)->IsArray()) {
+      if (Nan::Has(obj, optionParamsKey).FromJust() && Nan::Get(obj, optionParamsKey).ToLocalChecked()->IsArray()) {
         params = ODBC::GetParametersFromArray(
-          Local<Array>::Cast(obj->Get(optionParamsKey)),
-          &paramCount);
+          Local<Array>::Cast(Nan::Get(obj, optionParamsKey).ToLocalChecked()),
+          &paramCount,
+          info.GetIsolate());
       }
       else {
         paramCount = 0;
       }
       
       Local<String> optionNoResultsKey = Nan::New(OPTION_NORESULTS);
-      if (obj->Has(optionNoResultsKey) && obj->Get(optionNoResultsKey)->IsBoolean()) {
-        noResultObject = obj->Get(optionNoResultsKey)->ToBoolean()->Value();
+      if (Nan::Has(obj, optionNoResultsKey).FromJust() && Nan::Get(obj, optionNoResultsKey).ToLocalChecked()->IsBoolean()) {
+        noResultObject = Local<Boolean>::Cast(Nan::Get(obj, optionNoResultsKey).ToLocalChecked())->Value();
       }
     }
     else {
@@ -1058,6 +1045,7 @@ NAN_METHOD(ODBCConnection::QuerySync) {
   
   if (SQL_SUCCEEDED(ret)) {
     if (paramCount) {
+      DEBUG_PRINTF("ODBCConnection::QuerySync - binding params\n");
       for (int i = 0; i < paramCount; i++) {
         prm = params[i];
         
@@ -1081,11 +1069,24 @@ NAN_METHOD(ODBCConnection::QuerySync) {
       }
     }
 
+    // #ifdef UNICODE
+      int sqlLen = sql->Length();
+      int sqlSize = (sqlLen * sizeof(uint16_t)) + sizeof(uint16_t);
+
+      uint16_t* sqlSubmit = (uint16_t *) malloc(sqlSize);
+      sql->Write(info.GetIsolate(), (uint16_t *) sqlSubmit);
+    // #else
+    //   int sqlLen = sql->Utf8Length();
+    //   int sqlSize = sqlLen + 1;
+    //   char* sqlSubmit = (char *) malloc(sqlSize);
+    //   sql->WriteUtf8(info.GetIsolate(), (char *) sqlSubmit);
+    // #endif
+
     if (SQL_SUCCEEDED(ret)) {
       ret = SQLExecDirect(
         hSTMT,
-        (SQLTCHAR *) **sql, 
-        sql->length());
+        (SQLTCHAR* ) sqlSubmit,
+        sqlLen);
     }
     
     // free parameters
@@ -1102,9 +1103,8 @@ NAN_METHOD(ODBCConnection::QuerySync) {
     }
     
     free(params);
+    free(sqlSubmit);
   }
-  
-  delete sql;
   
   //check to see if there was an error during execution
   if (ret == SQL_ERROR) {
@@ -1164,7 +1164,7 @@ NAN_METHOD(ODBCConnection::GetInfoSync) {
     return Nan::ThrowTypeError("ODBCConnection::GetInfoSync(): Requires 1 Argument.");
   }
 
-  SQLUSMALLINT InfoType = info[0]->NumberValue();
+  SQLUSMALLINT InfoType = Local<Number>::Cast(info[0])->Value();
 
   switch (InfoType) {
     case SQL_USER_NAME:
@@ -1223,43 +1223,43 @@ NAN_METHOD(ODBCConnection::Tables) {
   data->column = NULL;
   data->cb = new Nan::Callback(cb);
 
-  if (!catalog->Equals(Nan::New("null").ToLocalChecked())) {
+  if (!Nan::Equals(catalog, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->catalog = (uint16_t *) malloc((catalog->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    catalog->Write((uint16_t *) data->catalog);
+    catalog->Write(info.GetIsolate(), (uint16_t *) data->catalog);
 #else
     data->catalog = (char *) malloc(catalog->Utf8Length() + 1);
-    catalog->WriteUtf8((char *) data->catalog);
+    catalog->WriteUtf8(info.GetIsolate(), (char *) data->catalog);
 #endif
   }
 
-  if (!schema->Equals(Nan::New("null").ToLocalChecked())) {
+  if (!Nan::Equals(schema, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->schema = (uint16_t *) malloc((schema->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    schema->Write((uint16_t *) data->schema);
+    schema->Write(info.GetIsolate(), (uint16_t *) data->schema);
 #else
     data->schema = (char *) malloc(schema->Utf8Length() + 1);
-    schema->WriteUtf8((char *) data->schema);
+    schema->WriteUtf8(info.GetIsolate(), (char *) data->schema);
 #endif
   }
   
-  if (!table->Equals(Nan::New("null").ToLocalChecked())) {
+  if (!Nan::Equals(table, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->table = (uint16_t *) malloc((table->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    table->Write((uint16_t *) data->table);
+    table->Write(info.GetIsolate(), (uint16_t *) data->table);
 #else
     data->table = (char *) malloc(table->Utf8Length() + 1);
-    table->WriteUtf8((char *) data->table);
+    table->WriteUtf8(info.GetIsolate(), (char *) data->table);
 #endif
   }
   
-  if (!type->Equals(Nan::New("null").ToLocalChecked())) {
+  if (!Nan::Equals(type, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->type = (uint16_t *) malloc((type->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    type->Write((uint16_t *) data->type);
+    type->Write(info.GetIsolate(), (uint16_t *) data->type);
 #else
     data->type = (char *) malloc(type->Utf8Length() + 1);
-    type->WriteUtf8((char *) data->type);
+    type->WriteUtf8(info.GetIsolate(), (char *) data->type);
 #endif
   }
   
@@ -1334,43 +1334,43 @@ NAN_METHOD(ODBCConnection::Columns) {
   data->column = NULL;
   data->cb = new Nan::Callback(cb);
 
-  if (!catalog->Equals(Nan::New("null").ToLocalChecked())) {
+  if (!Nan::Equals(catalog, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->catalog = (uint16_t *) malloc((catalog->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    catalog->Write((uint16_t *) data->catalog);
+    catalog->Write(info.GetIsolate(), (uint16_t *) data->catalog);
 #else
     data->catalog = (char *) malloc(catalog->Utf8Length() + 1);
-    catalog->WriteUtf8((char *) data->catalog);
+    catalog->WriteUtf8(info.GetIsolate(), (char *) data->catalog);
 #endif
   }
 
-  if (!schema->Equals(Nan::New("null").ToLocalChecked())) {
+  if (!Nan::Equals(schema, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->schema = (uint16_t *) malloc((schema->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    schema->Write((uint16_t *) data->schema);
+    schema->Write(info.GetIsolate(), (uint16_t *) data->schema);
 #else
     data->schema = (char *) malloc(schema->Utf8Length() + 1);
-    schema->WriteUtf8((char *) data->schema);
+    schema->WriteUtf8(info.GetIsolate(), (char *) data->schema);
 #endif
   }
   
-  if (!table->Equals(Nan::New("null").ToLocalChecked())) {
+  if (!Nan::Equals(table, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->table = (uint16_t *) malloc((table->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    table->Write((uint16_t *) data->table);
+    table->Write(info.GetIsolate(), (uint16_t *) data->table);
 #else
     data->table = (char *) malloc(table->Utf8Length() + 1);
-    table->WriteUtf8((char *) data->table);
+    table->WriteUtf8(info.GetIsolate(), (char *) data->table);
 #endif
   }
   
-  if (!column->Equals(Nan::New("null").ToLocalChecked())) {
+  if (!Nan::Equals(column, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->column = (uint16_t *) malloc((column->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    column->Write((uint16_t *) data->column);
+    column->Write(info.GetIsolate(), (uint16_t *) data->column);
 #else
     data->column = (char *) malloc(column->Utf8Length() + 1);
-    column->WriteUtf8((char *) data->column);
+    column->WriteUtf8(info.GetIsolate(), (char *) data->column);
 #endif
   }
   
