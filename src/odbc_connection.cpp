@@ -1076,10 +1076,10 @@ NAN_METHOD(ODBCConnection::QuerySync) {
       uint16_t* sqlSubmit = (uint16_t *) malloc(sqlSize);
       sql->Write(info.GetIsolate(), (uint16_t *) sqlSubmit);
     // #else
-    //   int sqlLen = sql->Utf8Length();
-    //   int sqlSize = sqlLen + 1;
-    //   char* sqlSubmit = (char *) malloc(sqlSize);
-    //   sql->WriteUtf8(info.GetIsolate(), (char *) sqlSubmit);
+      // int sqlLen = sql->Utf8Length(info.GetIsolate());
+      // int sqlSize = sqlLen + 1;
+      // char* sqlSubmit = (char *) malloc(sqlSize);
+      // sql->WriteUtf8(info.GetIsolate(), (char *) sqlSubmit);
     // #endif
 
     if (SQL_SUCCEEDED(ret)) {
