@@ -282,7 +282,7 @@ void ODBCResult::UV_AfterFetch(uv_work_t* work_req, int status) {
 
     Nan::TryCatch try_catch;
 
-    data->cb->Call(2, info);
+    Nan::Call(*data->cb, 2, info);
     delete data->cb;
 
     if (try_catch.HasCaught()) {
@@ -306,7 +306,7 @@ void ODBCResult::UV_AfterFetch(uv_work_t* work_req, int status) {
 
     Nan::TryCatch try_catch;
 
-    data->cb->Call(2, info);
+    Nan::Call(*data->cb, 2, info);
     delete data->cb;
 
     if (try_catch.HasCaught()) {
@@ -565,7 +565,7 @@ void ODBCResult::UV_AfterFetchAll(uv_work_t* work_req, int status) {
 
     Nan::TryCatch try_catch;
 
-    data->cb->Call(2, info);
+    Nan::Call(*data->cb, 2, info);
     delete data->cb;
     data->rows.Reset();
     data->objError.Reset();
