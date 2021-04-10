@@ -190,7 +190,7 @@ void ODBC::UV_AfterCreateConnection(uv_work_t* req, int status) {
     
     info[0] = ODBC::GetSQLError(SQL_HANDLE_ENV, data->dbo->m_hEnv);
     
-    data->cb->Call(1, info);
+    Nan::Call(*data->cb, 1, info);
   }
   else {
     Local<Value> info[2];
@@ -202,7 +202,7 @@ void ODBC::UV_AfterCreateConnection(uv_work_t* req, int status) {
     info[0] = Nan::Null();
     info[1] = js_result;
 
-    data->cb->Call(data->dbo->handle(), 2, info);
+    Nan::Call(*data->cb, data->dbo->handle(), 2, info);
   }
   
   if (try_catch.HasCaught()) {
@@ -785,7 +785,7 @@ Local<Value> ODBC::CallbackSQLError (SQLSMALLINT handleType,
   
   Local<Value> info[1];
   info[0] = objError;
-  cb->Call(1, info);
+  Nan::Call(*cb, 1, info);
   
   return scope.Escape(Nan::Undefined());
 }
@@ -974,15 +974,15 @@ NAN_METHOD(ODBC::LoadODBCLibrary) {
 }
 #endif
 
-extern "C" void init(Local<Object> exports) {
+NAN_MODULE_INIT(init) {
 #ifdef dynodbc
-  exports->Set(Nan::New("loadODBCLibrary").ToLocalChecked(),
+  target->Set(Nan::New("loadODBCLibrary").ToLocalChecked(),
         Nan::New<FunctionTemplate>(ODBC::LoadODBCLibrary)->GetFunction());
 #endif
-  ODBC::Init(exports);
-  ODBCResult::Init(exports);
-  ODBCConnection::Init(exports);
-  ODBCStatement::Init(exports);
+  ODBC::Init(target);
+  ODBCResult::Init(target);
+  ODBCConnection::Init(target);
+  ODBCStatement::Init(target);
 }
 
 NODE_MODULE(odbc_bindings, init)

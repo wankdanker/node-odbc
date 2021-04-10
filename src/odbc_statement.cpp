@@ -225,7 +225,7 @@ void ODBCStatement::UV_AfterExecute(uv_work_t* req, int status) {
 
     Nan::TryCatch try_catch;
 
-    data->cb->Call(2, info);
+    Nan::Call(*data->cb, 2, info);
 
     if (try_catch.HasCaught()) {
         Nan::FatalException(try_catch);
@@ -363,7 +363,7 @@ void ODBCStatement::UV_AfterExecuteNonQuery(uv_work_t* req, int status) {
 
     Nan::TryCatch try_catch;
     
-    data->cb->Call(2, info);
+    Nan::Call(*data->cb, 2, info);
 
     if (try_catch.HasCaught()) {
         Nan::FatalException(try_catch);
@@ -513,7 +513,7 @@ void ODBCStatement::UV_AfterExecuteDirect(uv_work_t* req, int status) {
 
     Nan::TryCatch try_catch;
 
-    data->cb->Call(2, info);
+    Nan::Call(*data->cb, 2, info);
 
     if (try_catch.HasCaught()) {
         Nan::FatalException(try_catch);
@@ -722,7 +722,7 @@ void ODBCStatement::UV_AfterPrepare(uv_work_t* req, int status) {
 
     Nan::TryCatch try_catch;
 
-    data->cb->Call( 2, info);
+    Nan::Call(*data->cb, 2, info);
 
     if (try_catch.HasCaught()) {
         Nan::FatalException(try_catch);
@@ -981,7 +981,7 @@ void ODBCStatement::UV_AfterBind(uv_work_t* req, int status) {
 
     Nan::TryCatch try_catch;
 
-    data->cb->Call( 2, info);
+    Nan::Call(*data->cb, 2, info);
 
     if (try_catch.HasCaught()) {
         Nan::FatalException(try_catch);

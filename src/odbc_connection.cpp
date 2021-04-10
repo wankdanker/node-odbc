@@ -317,7 +317,7 @@ void ODBCConnection::UV_AfterOpen(uv_work_t* req, int status) {
   Nan::TryCatch try_catch;
 
   data->conn->Unref();
-  data->cb->Call(data->conn->handle(), err ? 1 : 0, argv);
+  Nan::Call(*data->cb, data->conn->handle(), err ? 1 : 0, argv);
 
   if (try_catch.HasCaught()) {
     Nan::FatalException(try_catch);
@@ -500,7 +500,7 @@ void ODBCConnection::UV_AfterClose(uv_work_t* req, int status) {
   Nan::TryCatch try_catch;
 
   data->conn->Unref();
-  data->cb->Call(err ? 1 : 0, argv);
+  Nan::Call(*data->cb, err ? 1 : 0, argv);
 
   if (try_catch.HasCaught()) {
     Nan::FatalException(try_catch);
@@ -655,7 +655,7 @@ void ODBCConnection::UV_AfterCreateStatement(uv_work_t* req, int status) {
 
   Nan::TryCatch try_catch;
 
-  data->cb->Call( 2, info);
+  Nan::Call(*data->cb, 2, info);
 
   if (try_catch.HasCaught()) {
     Nan::FatalException(try_catch);
@@ -883,7 +883,7 @@ void ODBCConnection::UV_AfterQuery(uv_work_t* req, int status) {
     info[0] = Nan::Null();
     info[1] = Nan::True();
     
-    data->cb->Call(2, info);
+    Nan::Call(*data->cb, 2, info);
   }
   else {
     Local<Value> info[4];
@@ -904,7 +904,7 @@ void ODBCConnection::UV_AfterQuery(uv_work_t* req, int status) {
     }
     info[1] = js_result;
     
-    data->cb->Call(2, info);
+    Nan::Call(*data->cb, 2, info);
   }
   
   data->conn->Unref();
@@ -1520,7 +1520,7 @@ void ODBCConnection::UV_AfterBeginTransaction(uv_work_t* req, int status) {
 
   Nan::TryCatch try_catch;
 
-  data->cb->Call( err ? 1 : 0, argv);
+  Nan::Call(*data->cb, err ? 1 : 0, argv);
 
   if (try_catch.HasCaught()) {
     Nan::FatalException(try_catch);
@@ -1700,7 +1700,7 @@ void ODBCConnection::UV_AfterEndTransaction(uv_work_t* req, int status) {
 
   Nan::TryCatch try_catch;
 
-  data->cb->Call(err ? 1 : 0, argv);
+  Nan::Call(*data->cb, err ? 1 : 0, argv);
 
   if (try_catch.HasCaught()) {
     Nan::FatalException(try_catch);
