@@ -3,3 +3,4 @@ build
 node_modules
 deps
 .ideapackage-lock.json
+.vscode
