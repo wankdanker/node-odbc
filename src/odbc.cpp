@@ -552,7 +552,7 @@ Local<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
           else {
             //we need to concatenate
 #ifdef UNICODE
-            str = String::Concat(isolate, str, Nan::New<String>((char *) buffer).ToLocalChecked());
+            str = String::Concat(isolate, str, Nan::New<String>((uint16_t *) buffer).ToLocalChecked());
 #else
             str = String::Concat(isolate, str, Nan::New<String>((char *) buffer).ToLocalChecked());
 #endif
@@ -570,9 +570,9 @@ Local<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
           //then there is probably an issue with the driver not correctly reporting
           //SQL_NO_DATA the next time around. This has been seen with MSSQL
           //sql_variant fields on FreeTDS.
-          if (SQL_SUCCESS_WITH_INFO == ret && len < bufferLength) {
-            break;
-          }
+          // if (SQL_SUCCESS_WITH_INFO == ret && len < bufferLength) {
+          //   break;
+          // }
 
           count += 1;
         }
