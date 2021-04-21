@@ -1,13 +1,17 @@
-note
-----
-
-This is the code for odbc@1.x.x. More recent versions are here: github.com/markdirish/node-odbc/
-
 node-odbc
 ---------
 
-An asynchronous/synchronous interface for node.js to unixODBC and its supported
-drivers.
+An asynchronous/synchronous interface for node.js to unixODBC and its supported drivers.
+
+versions
+--------
+
+This is the code for odbc@1.X.X. More [recent versions](https://github.com/markdirish/node-odbc/)
+have a slightly different and not backwards compatible API. I will attempt to continue to release 
+backwards compatible releases of the odbc@1.x.x API from this code base. 
+
+* v1.4.10 is compatible with node versions 3 through 16.
+* v1.5.0 will have promises
 
 requirements
 ------------
