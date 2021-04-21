@@ -170,6 +170,8 @@ struct query_request {
 #define DEBUG_TPRINTF(...) (void)0
 #endif
 
+
+
 #define REQ_ARGS(N)                                                     \
   if (info.Length() < (N))                                              \
     return Nan::ThrowTypeError("Expected " #N "arguments");
@@ -243,5 +245,25 @@ struct query_request {
   (constructor_template)->Set(Nan::New<String>(#constant).ToLocalChecked(),                \
                 Nan::New<Number>(constant),                               \
                 static_cast<v8::PropertyAttribute>(v8::ReadOnly|v8::DontDelete))
+
+#if NODE_MAJOR_VERSION >= 11
+
+#define STRING_WRITE(string, isolate, target) \
+  string->Write(isolate, target);
+#define STRING_WRITEUTF8(string, isolate, target) \
+  string->WriteUtf8(isolate, target);
+#define STRING_CONCAT(isolate, string, target) \
+  String::Concat(isolate, string, target);
+
+#else
+
+#define STRING_WRITE(string, isolate, target) \
+  string->Write(target);
+#define STRING_WRITEUTF8(string, isolate, target) \
+  string->WriteUtf8(target);
+#define STRING_CONCAT(isolate, string, target) \
+  String::Concat(string, target);  
+#endif
+
 
 #endif

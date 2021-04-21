@@ -552,9 +552,9 @@ Local<Value> ODBC::GetColumnValue( SQLHSTMT hStmt, Column column,
           else {
             //we need to concatenate
 #ifdef UNICODE
-            str = String::Concat(isolate, str, Nan::New<String>((uint16_t *) buffer).ToLocalChecked());
+            str = STRING_CONCAT(isolate, str, Nan::New<String>((uint16_t *) buffer).ToLocalChecked());
 #else
-            str = String::Concat(isolate, str, Nan::New<String>((char *) buffer).ToLocalChecked());
+            str = STRING_CONCAT(isolate, str, Nan::New<String>((char *) buffer).ToLocalChecked());
 #endif
           }
           
@@ -692,9 +692,9 @@ Parameter* ODBC::GetParametersFromArray (Local<Array> values, int *paramCount, I
       params[i].StrLen_or_IndPtr  = SQL_NTS;//params[i].BufferLength;
 
 #ifdef UNICODE
-      string->Write(isolate, (uint16_t *) params[i].ParameterValuePtr);
+      STRING_WRITE(string, isolate, (uint16_t *) params[i].ParameterValuePtr);
 #else
-      string->WriteUtf8(isolate, (char *) params[i].ParameterValuePtr);
+      STRING_WRITEUTF8(string, isolate, (char *) params[i].ParameterValuePtr);
 #endif
 
       DEBUG_PRINTF("ODBC::GetParametersFromArray - IsString(): params[%i] c_type=%i type=%i buffer_length=%lli size=%lli length=%lli value=%s\n",

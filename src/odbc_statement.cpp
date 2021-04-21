@@ -444,11 +444,11 @@ NAN_METHOD(ODBCStatement::ExecuteDirect) {
 #ifdef UNICODE
   data->sqlLen = sql->Length();
   data->sql = (uint16_t *) malloc((data->sqlLen * sizeof(uint16_t)) + sizeof(uint16_t));
-  sql->Write(info.GetIsolate(), (uint16_t *) data->sql);
+  STRING_WRITE(sql, info.GetIsolate(), (uint16_t *) data->sql);
 #else
   data->sqlLen = sql->Utf8Length();
   data->sql = (char *) malloc(data->sqlLen +1);
-  sql->WriteUtf8(info.GetIsolate(), (char *) data->sql);
+  STRING_WRITEUTF8(sql, info.GetIsolate(), (char *) data->sql);
 #endif
 
   data->stmt = stmt;
@@ -596,11 +596,11 @@ NAN_METHOD(ODBCStatement::PrepareSync) {
 #ifdef UNICODE
   int sqlLen = sql->Length() + 1;
   uint16_t* sql2 = (uint16_t *) malloc(sqlLen * sizeof(uint16_t));
-  sql->Write(info.GetIsolate(), sql2);
+  STRING_WRITE(sql, info.GetIsolate(), sql2);
 #else
   int sqlLen = sql->Utf8Length() + 1;
   char* sql2 = (char *) malloc(sqlLen);
-  sql->WriteUtf8(info.GetIsolate(), sql2);
+  STRING_WRITEUTF8(sql, info.GetIsolate(), sql2);
 #endif
   
   ret = SQLPrepare(
@@ -649,11 +649,11 @@ NAN_METHOD(ODBCStatement::Prepare) {
 #ifdef UNICODE
   data->sqlLen = sql->Length();
   data->sql = (uint16_t *) malloc((data->sqlLen * sizeof(uint16_t)) + sizeof(uint16_t));
-  sql->Write(info.GetIsolate(), (uint16_t *) data->sql);
+  STRING_WRITE(sql, info.GetIsolate(), (uint16_t *) data->sql);
 #else
   data->sqlLen = sql->Utf8Length();
   data->sql = (char *) malloc(data->sqlLen +1);
-  sql->WriteUtf8(info.GetIsolate(), (char *) data->sql);
+  STRING_WRITEUTF8(sql, info.GetIsolate(), (char *) data->sql);
 #endif
   
   data->stmt = stmt;

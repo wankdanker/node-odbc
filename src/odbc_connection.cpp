@@ -203,11 +203,11 @@ NAN_METHOD(ODBCConnection::Open) {
 #ifdef UNICODE
   data->connectionLength = connection->Length() + 1;
   data->connection = (uint16_t *) malloc(sizeof(uint16_t) * data->connectionLength);
-  connection->Write(info.GetIsolate(), (uint16_t*) data->connection);
+  STRING_WRITE(connection, info.GetIsolate(), (uint16_t*) data->connection);
 #else
   data->connectionLength = connection->Utf8Length() + 1;
   data->connection = (char *) malloc(sizeof(char) * data->connectionLength);
-  connection->WriteUtf8(info.GetIsolate(), (char*) data->connection);
+  STRING_WRITEUTF8(connection, info.GetIsolate(), (char*) data->connection);
 #endif
   
   data->cb = new Nan::Callback(cb);
@@ -352,11 +352,11 @@ NAN_METHOD(ODBCConnection::OpenSync) {
 #ifdef UNICODE
   int connectionLength = connection->Length() + 1;
   uint16_t* connectionString = (uint16_t *) malloc(connectionLength * sizeof(uint16_t));
-  connection->Write(info.GetIsolate(), connectionString);
+  STRING_WRITE(connection, info.GetIsolate(), connectionString);
 #else
   int connectionLength = connection->Utf8Length() + 1;
   char* connectionString = (char *) malloc(connectionLength);
-  connection->WriteUtf8(info.GetIsolate(), connectionString);
+  STRING_WRITEUTF8(connection, info.GetIsolate(), connectionString);
 #endif
   
   uv_mutex_lock(&ODBC::g_odbcMutex);
@@ -775,12 +775,12 @@ NAN_METHOD(ODBCConnection::Query) {
   data->sqlLen = sql->Length();
   data->sqlSize = (data->sqlLen * sizeof(uint16_t)) + sizeof(uint16_t);
   data->sql = (uint16_t *) malloc(data->sqlSize);
-  sql->Write(info.GetIsolate(), (uint16_t *) data->sql);
+  STRING_WRITE(sql, info.GetIsolate(), (uint16_t *) data->sql);
 #else
   data->sqlLen = sql->Utf8Length();
   data->sqlSize = data->sqlLen + 1;
   data->sql = (char *) malloc(data->sqlSize);
-  sql->WriteUtf8(info.GetIsolate(), (char *) data->sql);
+  STRING_WRITEUTF8(sql, info.GetIsolate(), (char *) data->sql);
 #endif
 
   DEBUG_PRINTF("ODBCConnection::Query : sqlLen=%i, sqlSize=%i, sql=%s\n",
@@ -1074,12 +1074,12 @@ NAN_METHOD(ODBCConnection::QuerySync) {
       int sqlSize = (sqlLen * sizeof(uint16_t)) + sizeof(uint16_t);
 
       uint16_t* sqlSubmit = (uint16_t *) malloc(sqlSize);
-      sql->Write(info.GetIsolate(), (uint16_t *) sqlSubmit);
+      STRING_WRITE(sql, info.GetIsolate(), (uint16_t *) sqlSubmit);
     // #else
       // int sqlLen = sql->Utf8Length(info.GetIsolate());
       // int sqlSize = sqlLen + 1;
       // char* sqlSubmit = (char *) malloc(sqlSize);
-      // sql->WriteUtf8(info.GetIsolate(), (char *) sqlSubmit);
+      // STRING_WRITEUTF8(sql, info.GetIsolate(), (char *) sqlSubmit);
     // #endif
 
     if (SQL_SUCCEEDED(ret)) {
@@ -1226,40 +1226,40 @@ NAN_METHOD(ODBCConnection::Tables) {
   if (!Nan::Equals(catalog, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->catalog = (uint16_t *) malloc((catalog->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    catalog->Write(info.GetIsolate(), (uint16_t *) data->catalog);
+    STRING_WRITE(catalog, info.GetIsolate(), (uint16_t *) data->catalog);
 #else
     data->catalog = (char *) malloc(catalog->Utf8Length() + 1);
-    catalog->WriteUtf8(info.GetIsolate(), (char *) data->catalog);
+    STRING_WRITEUTF8(catalog, info.GetIsolate(), (char *) data->catalog);
 #endif
   }
 
   if (!Nan::Equals(schema, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->schema = (uint16_t *) malloc((schema->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    schema->Write(info.GetIsolate(), (uint16_t *) data->schema);
+    STRING_WRITE(schema, info.GetIsolate(), (uint16_t *) data->schema);
 #else
     data->schema = (char *) malloc(schema->Utf8Length() + 1);
-    schema->WriteUtf8(info.GetIsolate(), (char *) data->schema);
+    STRING_WRITEUTF8(schema, info.GetIsolate(), (char *) data->schema);
 #endif
   }
   
   if (!Nan::Equals(table, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->table = (uint16_t *) malloc((table->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    table->Write(info.GetIsolate(), (uint16_t *) data->table);
+    STRING_WRITE(table, info.GetIsolate(), (uint16_t *) data->table);
 #else
     data->table = (char *) malloc(table->Utf8Length() + 1);
-    table->WriteUtf8(info.GetIsolate(), (char *) data->table);
+    STRING_WRITEUTF8(table, info.GetIsolate(), (char *) data->table);
 #endif
   }
   
   if (!Nan::Equals(type, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->type = (uint16_t *) malloc((type->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    type->Write(info.GetIsolate(), (uint16_t *) data->type);
+    STRING_WRITE(type, info.GetIsolate(), (uint16_t *) data->type);
 #else
     data->type = (char *) malloc(type->Utf8Length() + 1);
-    type->WriteUtf8(info.GetIsolate(), (char *) data->type);
+    STRING_WRITEUTF8(type, info.GetIsolate(), (char *) data->type);
 #endif
   }
   
@@ -1337,40 +1337,40 @@ NAN_METHOD(ODBCConnection::Columns) {
   if (!Nan::Equals(catalog, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->catalog = (uint16_t *) malloc((catalog->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    catalog->Write(info.GetIsolate(), (uint16_t *) data->catalog);
+    STRING_WRITE(catalog, info.GetIsolate(), (uint16_t *) data->catalog);
 #else
     data->catalog = (char *) malloc(catalog->Utf8Length() + 1);
-    catalog->WriteUtf8(info.GetIsolate(), (char *) data->catalog);
+    STRING_WRITEUTF8(catalog, info.GetIsolate(), (char *) data->catalog);
 #endif
   }
 
   if (!Nan::Equals(schema, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->schema = (uint16_t *) malloc((schema->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    schema->Write(info.GetIsolate(), (uint16_t *) data->schema);
+    STRING_WRITE(schema, info.GetIsolate(), (uint16_t *) data->schema);
 #else
     data->schema = (char *) malloc(schema->Utf8Length() + 1);
-    schema->WriteUtf8(info.GetIsolate(), (char *) data->schema);
+    STRING_WRITEUTF8(schema, info.GetIsolate(), (char *) data->schema);
 #endif
   }
   
   if (!Nan::Equals(table, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->table = (uint16_t *) malloc((table->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    table->Write(info.GetIsolate(), (uint16_t *) data->table);
+    STRING_WRITE(table, info.GetIsolate(), (uint16_t *) data->table);
 #else
     data->table = (char *) malloc(table->Utf8Length() + 1);
-    table->WriteUtf8(info.GetIsolate(), (char *) data->table);
+    STRING_WRITEUTF8(table, info.GetIsolate(), (char *) data->table);
 #endif
   }
   
   if (!Nan::Equals(column, Nan::Null()).FromJust()) {
 #ifdef UNICODE
     data->column = (uint16_t *) malloc((column->Length() * sizeof(uint16_t)) + sizeof(uint16_t));
-    column->Write(info.GetIsolate(), (uint16_t *) data->column);
+    STRING_WRITE(column, info.GetIsolate(), (uint16_t *) data->column);
 #else
     data->column = (char *) malloc(column->Utf8Length() + 1);
-    column->WriteUtf8(info.GetIsolate(), (char *) data->column);
+    STRING_WRITEUTF8(column, info.GetIsolate(), (char *) data->column);
 #endif
   }
   
