@@ -30,7 +30,8 @@
   },
   "scripts": {
     "install": "node-gyp configure build",
-    "test": "cd test && node run-tests.js"
+    "test": "cd test && node run-tests.js",
+    "publish": "npm publish --registry=https://registry.npmjs.org --tag=v1-latest"
   },
   "dependencies": {
     "bindings": "^1.3.0",
